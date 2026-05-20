@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clasificación · Polla Mundial 2026</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="hero" style="padding:24px">
+  <h1 style="font-size:1.6rem">🏆 Tabla de Clasificación</h1>
+  <p class="subtitle">Actualizada en tiempo real</p>
+</div>
+<nav>
+  <a href="index.html">🏠 Inicio</a>
+  <a href="predictions.html">✏️ Predicciones</a>
+  <a href="leaderboard.html" class="active">🏆 Clasificación</a>
+  <a href="rules.html">📋 Reglas</a>
+</nav>
+
+<div class="container">
+
+  <!-- Prize pool -->
+  <div class="card">
+    <h2>💰 Premio acumulado</h2>
+    <div class="prize-box">
+      <div class="prize-item">
+        <div class="prize-medal">🥇</div>
+        <div class="prize-label">1er lugar (65%)</div>
+        <div class="prize-amount" id="prize1">—</div>
+      </div>
+      <div class="prize-item">
+        <div class="prize-medal">🥈</div>
+        <div class="prize-label">2do lugar (35%)</div>
+        <div class="prize-amount" id="prize2">—</div>
+      </div>
+    </div>
+    <p class="text-gray text-center mt-8" style="font-size:0.8rem" id="prizeNote">—</p>
+  </div>
+
+  <!-- Leaderboard -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="margin:0">📊 Posiciones</h2>
+      <button class="btn btn-sm btn-primary" onclick="loadLeaderboard()">↻ Actualizar</button>
+    </div>
+
+    <!-- Header -->
+    <div class="lb-row lb-header" style="background:transparent;border-color:transparent">
+      <div>#</div>
+      <div>PARTICIPANTE</div>
+      <div style="text-align:center">PUNTOS</div>
+      <div style="text-align:center">PAGO</div>
+    </div>
+
+    <div id="lbContainer">
+      <div class="loading"><div class="spinner"></div><p class="mt-8">Cargando...</p></div>
+    </div>
+  </div>
+
+  <!-- My position highlight -->
+  <div class="card" id="myPositionCard" style="display:none">
+    <h2>🎯 Tu posición</h2>
+    <p id="myPositionText" class="text-gray"></p>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/matches.js"></script>
+<script src="js/supabase.js"></script>
+<script>
+let myParticipant = null;
+
+window.addEventListener('DOMContentLoaded', async () => {
+  const saved = localStorage.getItem('polla_participant');
+  if (saved) myParticipant = JSON.parse(saved);
+  await loadLeaderboard();
+  // Auto-refresh every 60 seconds
+  setInterval(loadLeaderboard, 60000);
+});
+
+async function loadLeaderboard() {
+  try {
+    const participants = await getParticipants();
+    renderLeaderboard(participants);
+    updatePrize(participants);
+  } catch(e) {
+    document.getElementById('lbContainer').innerHTML =
+      `<div class="alert alert-error">Error cargando datos: ${e.message}</div>`;
+  }
+}
+
+function renderLeaderboard(participants) {
+  if (!participants || participants.length === 0) {
+    document.getElementById('lbContainer').innerHTML =
+      '<p class="text-gray text-center" style="padding:24px">Aún no hay participantes registrados</p>';
+    return;
+  }
+
+  const medals = ['🥇','🥈','🥉'];
+  let html = '';
+  participants.forEach((p, i) => {
+    const rank = i + 1;
+    const isMe = myParticipant && p.id === myParticipant.id;
+    const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+    const medal = medals[i] || rank;
+    html += `
+    <div class="lb-row" style="${isMe ? 'border-color:var(--accent);background:#0a1e2e' : ''}">
+      <div class="lb-rank ${rankClass}">${medal}</div>
+      <div class="lb-name">
+        ${p.name}
+        ${isMe ? '<span style="color:var(--accent);font-size:0.75rem"> ← Tú</span>' : ''}
+      </div>
+      <div class="lb-pts">${p.total_points}</div>
+      <div class="lb-paid ${p.paid ? 'yes' : 'no'}">${p.paid ? '✅ Pagó' : '⏳ Pendiente'}</div>
+    </div>`;
+  });
+  document.getElementById('lbContainer').innerHTML = html;
+
+  // Show my position
+  if (myParticipant) {
+    const myIdx = participants.findIndex(p => p.id === myParticipant.id);
+    if (myIdx >= 0) {
+      const card = document.getElementById('myPositionCard');
+      card.style.display = 'block';
+      const total = participants.length;
+      const ahead = total - myIdx - 1;
+      document.getElementById('myPositionText').innerHTML =
+        `Estás en el <strong class="text-gold">puesto ${myIdx+1} de ${total}</strong>. 
+         Tienes <strong class="text-accent">${participants[myIdx].total_points} puntos</strong>.
+         ${myIdx > 0 ? `Te separan <strong>${participants[myIdx-1].total_points - participants[myIdx].total_points} pts</strong> del puesto ${myIdx}.` : '¡Estás liderando! 🔥'}`;
+    }
+  }
+}
+
+function updatePrize(participants) {
+  const n = participants ? participants.length : 0;
+  const total = n * 10;
+  document.getElementById('prize1').textContent = '$' + Math.round(total * 0.65);
+  document.getElementById('prize2').textContent = '$' + Math.round(total * 0.35);
+  const paid = participants ? participants.filter(p => p.paid).length : 0;
+  document.getElementById('prizeNote').textContent =
+    `${n} inscritos · ${paid} pagados · Bote confirmado: $${paid * 10} USD`;
+}
+</script>
+</body>
+</html>

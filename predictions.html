@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mis Predicciones · Polla Mundial 2026</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="hero" style="padding:24px">
+  <h1 style="font-size:1.6rem">✏️ Mis Predicciones</h1>
+  <p class="subtitle" id="heroName">Cargando...</p>
+</div>
+<nav>
+  <a href="index.html">🏠 Inicio</a>
+  <a href="predictions.html" class="active">✏️ Predicciones</a>
+  <a href="leaderboard.html">🏆 Clasificación</a>
+  <a href="rules.html">📋 Reglas</a>
+</nav>
+
+<div class="container">
+  <div id="notLoggedIn" style="display:none">
+    <div class="card text-center">
+      <p class="text-gray">Debes registrarte primero</p>
+      <a href="index.html" class="btn btn-primary mt-16">Ir al inicio →</a>
+    </div>
+  </div>
+
+  <div id="mainContent" style="display:none">
+    <div class="alert alert-info">
+      ⚠️ <strong>Fase 1</strong> — Predicciones de grupos. Cierra el <strong>11 Jun antes de las 3 PM ET</strong>. Después habrá penalización de -2 pts por cambio.
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="showTab('matches')">⚽ Partidos</button>
+      <button class="tab-btn" onclick="showTab('groups')">📊 Clasificados</button>
+      <button class="tab-btn" onclick="showTab('champion')">🏆 Campeón</button>
+    </div>
+
+    <!-- TAB: PARTIDOS -->
+    <div id="tab-matches">
+      <div id="matchesContainer"></div>
+    </div>
+
+    <!-- TAB: CLASIFICADOS POR GRUPO -->
+    <div id="tab-groups" style="display:none">
+      <div class="card mb-0">
+        <h2>📊 ¿Quién clasifica de cada grupo?</h2>
+        <p class="text-gray" style="font-size:0.85rem;margin-bottom:16px">Selecciona el 1° y 2° clasificado de cada grupo. Esto te da puntos extra.</p>
+      </div>
+      <div id="groupsContainer"></div>
+    </div>
+
+    <!-- TAB: CAMPEÓN -->
+    <div id="tab-champion" style="display:none">
+      <div class="card">
+        <h2>🏆 Predicción Final del Torneo</h2>
+        <p class="text-gray" style="font-size:0.85rem;margin-bottom:20px">
+          Acierta el campeón: <strong class="text-gold">+40 pts</strong> · Subcampeón: <strong class="text-gold">+20 pts</strong>
+        </p>
+        <div class="form-group">
+          <label>🥇 Campeón del mundo</label>
+          <select id="champSelect"><option value="">-- Selecciona un equipo --</option></select>
+        </div>
+        <div class="form-group">
+          <label>🥈 Subcampeón</label>
+          <select id="runnerUpSelect"><option value="">-- Selecciona un equipo --</option></select>
+        </div>
+      </div>
+    </div>
+
+    <div id="saveMsg"></div>
+    <button class="btn btn-gold btn-block" onclick="saveAll()" id="saveBtn">
+      💾 Guardar todas mis predicciones
+    </button>
+    <p class="text-gray text-center mt-8" style="font-size:0.8rem">Puedes guardar varias veces antes del cierre</p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/matches.js"></script>
+<script src="js/supabase.js"></script>
+<script>
+let participant = null;
+let existingPreds = { matches: [], groups: [], champion: null };
+
+const allTeams = [...new Set(MATCHES.flatMap(m => [m.home, m.away]))].sort();
+
+window.addEventListener('DOMContentLoaded', async () => {
+  const saved = localStorage.getItem('polla_participant');
+  if (!saved) { document.getElementById('notLoggedIn').style.display='block'; return; }
+  participant = JSON.parse(saved);
+  document.getElementById('heroName').textContent = participant.name;
+  document.getElementById('mainContent').style.display='block';
+
+  try {
+    existingPreds = await getPredictionsForParticipant(participant.id);
+  } catch(e) {}
+
+  renderMatches();
+  renderGroups();
+  renderChampion();
+});
+
+function showTab(tab) {
+  ['matches','groups','champion'].forEach(t => {
+    document.getElementById('tab-'+t).style.display = t===tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    b.classList.toggle('active', ['matches','groups','champion'][i]===tab);
+  });
+}
+
+function getExistingMatch(matchId) {
+  return existingPreds.matches.find(p => p.match_id === matchId);
+}
+
+function renderMatches() {
+  const container = document.getElementById('matchesContainer');
+  const byGroup = {};
+  MATCHES.forEach(m => { if(!byGroup[m.group]) byGroup[m.group]=[]; byGroup[m.group].push(m); });
+
+  let html = '';
+  Object.entries(byGroup).forEach(([grp, matches]) => {
+    html += `<div class="group-header grp-${grp}"><span class="grp-badge grp-${grp}">${grp}</span> Grupo ${grp}</div>`;
+    matches.forEach(m => {
+      const ex = getExistingMatch(m.id);
+      const h = ex ? ex.home_score : '';
+      const a = ex ? ex.away_score : '';
+      html += `
+      <div class="match-row" title="${m.venue}">
+        <div class="match-team home">${m.home}</div>
+        <div class="match-score"><input type="number" min="0" max="20" id="h${m.id}" value="${h}" placeholder="—"></div>
+        <div class="match-vs">VS</div>
+        <div class="match-score"><input type="number" min="0" max="20" id="a${m.id}" value="${a}" placeholder="—"></div>
+        <div class="match-team away">${m.away}</div>
+      </div>
+      <div class="match-date">${m.date} · ${m.time} ET · ${m.venue}</div>`;
+    });
+  });
+  container.innerHTML = html;
+}
+
+function renderGroups() {
+  const container = document.getElementById('groupsContainer');
+  let html = '';
+  Object.entries(GROUPS).forEach(([grp, teams]) => {
+    const ex = existingPreds.groups.find(g => g.group_key === grp);
+    const first = ex ? ex.first_place : '';
+    const second = ex ? ex.second_place : '';
+    const opts = teams.map(t => `<option value="${t}" ${t===first?'selected':''}>${t}</option>`).join('');
+    const opts2 = teams.map(t => `<option value="${t}" ${t===second?'selected':''}>${t}</option>`).join('');
+    html += `
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <span class="grp-badge grp-${grp}">${grp}</span>
+        <strong>Grupo ${grp}</strong>
+        <span class="text-gray" style="font-size:0.8rem">${teams.join(' · ')}</span>
+      </div>
+      <div class="classify-row">
+        <label>🥇 1° lugar</label>
+        <select id="g${grp}1"><option value="">--</option>${opts}</select>
+      </div>
+      <div class="classify-row">
+        <label>🥈 2° lugar</label>
+        <select id="g${grp}2"><option value="">--</option>${opts2}</select>
+      </div>
+    </div>`;
+  });
+  container.innerHTML = html;
+}
+
+function renderChampion() {
+  const teamOpts = allTeams.map(t => `<option value="${t}">${t}</option>`).join('');
+  document.getElementById('champSelect').innerHTML += teamOpts;
+  document.getElementById('runnerUpSelect').innerHTML += teamOpts;
+  if (existingPreds.champion) {
+    document.getElementById('champSelect').value = existingPreds.champion.champion || '';
+    document.getElementById('runnerUpSelect').value = existingPreds.champion.runner_up || '';
+  }
+}
+
+async function saveAll() {
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+
+  try {
+    // Collect match predictions
+    const matchPreds = MATCHES.map(m => ({
+      match_id: m.id,
+      home_score: parseInt(document.getElementById('h'+m.id)?.value ?? '') ,
+      away_score: parseInt(document.getElementById('a'+m.id)?.value ?? ''),
+    })).filter(p => !isNaN(p.home_score) && !isNaN(p.away_score));
+
+    // Collect group predictions
+    const groupPreds = Object.keys(GROUPS).map(grp => ({
+      group_key: grp,
+      first_place: document.getElementById('g'+grp+'1')?.value || null,
+      second_place: document.getElementById('g'+grp+'2')?.value || null,
+    })).filter(g => g.first_place || g.second_place);
+
+    // Champion
+    const champ = document.getElementById('champSelect').value;
+    const runnerUp = document.getElementById('runnerUpSelect').value;
+
+    await Promise.all([
+      matchPreds.length ? savePredictions(participant.id, matchPreds) : Promise.resolve(),
+      groupPreds.length ? saveGroupPredictions(participant.id, groupPreds) : Promise.resolve(),
+      champ ? saveChampionPrediction(participant.id, champ, runnerUp) : Promise.resolve(),
+    ]);
+
+    document.getElementById('saveMsg').innerHTML =
+      '<div class="alert alert-success">✅ ¡Predicciones guardadas! Ya puedes cerrar esta página.</div>';
+    window.scrollTo({top: document.getElementById('saveMsg').offsetTop - 20, behavior:'smooth'});
+  } catch(e) {
+    document.getElementById('saveMsg').innerHTML =
+      `<div class="alert alert-error">❌ Error al guardar: ${e.message}</div>`;
+  }
+
+  btn.disabled = false; btn.textContent = '💾 Guardar todas mis predicciones';
+}
+</script>
+</body>
+</html>
