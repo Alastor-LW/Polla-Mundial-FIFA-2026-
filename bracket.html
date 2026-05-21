@@ -16,7 +16,8 @@
 </nav>
 <div class="container">
   <div id="noAuth" style="display:none">
-    <div class="card text-center"><p class="text-gray">Debes registrarte primero</p><a href="index.html" class="btn btn-primary mt-16">Ir al inicio →</a></div>
+    <div class="card text-center"><p class="text-gray">Debes registrarte primero</p>
+    <a href="index.html" class="btn btn-primary mt-16">Ir al inicio →</a></div>
   </div>
   <div id="mainContent" style="display:none">
     <div class="tabs">
@@ -25,39 +26,31 @@
       <button class="tab-btn" onclick="showTab('bracket')">🔱 Bracket</button>
     </div>
 
-    <!-- STANDINGS -->
     <div id="tab-standings">
-      <div class="alert alert-info" style="font-size:.82rem">📐 Calculado automáticamente con tus predicciones de grupos.</div>
+      <div class="alert alert-info" style="font-size:.82rem">📐 Calculado automáticamente con tus predicciones.</div>
       <div id="standingsContainer"><div class="loading"><div class="spinner"></div></div></div>
     </div>
 
-    <!-- QUALIFIED -->
     <div id="tab-qualified" style="display:none">
       <div class="card">
-        <h2>✅ Los 32 clasificados según tus predicciones</h2>
+        <h2>✅ Los 32 clasificados</h2>
         <p class="text-gray" style="font-size:.82rem;margin-bottom:14px">🥇 Primeros · 🥈 Segundos · ⚡ Mejores terceros</p>
         <div id="qualifiedContainer"></div>
       </div>
-      <div class="card">
-        <h2>⚡ 8 Mejores Terceros</h2>
-        <div id="thirdsContainer"></div>
-      </div>
+      <div class="card"><h2>⚡ 8 Mejores Terceros</h2><div id="thirdsContainer"></div></div>
     </div>
 
-    <!-- BRACKET -->
     <div id="tab-bracket" style="display:none">
       <div class="alert alert-warn" id="bracketPhaseMsg" style="font-size:.82rem"></div>
       <div id="bracketSaveMsg"></div>
       <p class="text-gray" style="font-size:.82rem;margin-bottom:12px">
-        💡 Ingresa los resultados y haz clic en <strong>"Guardar"</strong> para ver el bracket avanzar.
+        💡 Llena los resultados de cada ronda y presiona <strong>💾 Guardar</strong>. Los ganadores pasan automáticamente a la siguiente ronda.
       </p>
       <div class="bracket-wrap">
-        <div class="bracket" id="bracketContainer" style="align-items:flex-start;"></div>
+        <div class="bracket" id="bracketContainer" style="align-items:flex-start;min-width:900px"></div>
       </div>
-      <button class="btn btn-gold btn-block mt-16" id="saveBracketBtn" onclick="saveBracket()">
-        💾 Guardar y actualizar bracket
-      </button>
-      <p class="text-gray text-center mt-8" style="font-size:.78rem">Los resultados se guardan y el bracket avanza automáticamente</p>
+      <button class="btn btn-gold btn-block mt-16" onclick="collectAndSave()">💾 Guardar y avanzar bracket</button>
+      <p class="text-gray text-center mt-8" style="font-size:.78rem">Guarda después de llenar cada ronda para ver los ganadores pasar</p>
     </div>
   </div>
 </div>
@@ -68,19 +61,24 @@
 <script>
 let participant=null, myScores={}, myElimScores={}, phase=1, r32teams=[];
 
-window.addEventListener('DOMContentLoaded',async()=>{
-  const saved=localStorage.getItem('polla_p');
-  if(!saved){document.getElementById('noAuth').style.display='block';return;}
-  participant=JSON.parse(saved);
-  document.getElementById('heroName').textContent=participant.name;
-  document.getElementById('mainContent').style.display='block';
+window.addEventListener('DOMContentLoaded', async () => {
+  const saved = localStorage.getItem('polla_p');
+  if (!saved) { document.getElementById('noAuth').style.display='block'; return; }
+  participant = JSON.parse(saved);
+  document.getElementById('heroName').textContent = participant.name;
+  document.getElementById('mainContent').style.display = 'block';
 
-  const[settings,preds]=await Promise.all([dbGetSettings(),dbGetPredictions(participant.id)]);
-  phase=settings.phase||1;
+  const [settings, preds] = await Promise.all([dbGetSettings(), dbGetPredictions(participant.id)]);
+  phase = settings.phase || 1;
 
-  preds.forEach(p=>{
-    if(p.match_id<=70) myScores[p.match_id]={home:p.home_score,away:p.away_score};
-    else myElimScores[p.match_id]={home:p.home_score,away:p.away_score};
+  // Load saved predictions — store as numbers for correct comparison
+  preds.forEach(p => {
+    const h = parseInt(p.home_score), a = parseInt(p.away_score);
+    if (p.match_id <= 70) {
+      myScores[p.match_id] = { home: isNaN(h)?'':h, away: isNaN(a)?'':a };
+    } else {
+      myElimScores[p.match_id] = { home: isNaN(h)?'':h, away: isNaN(a)?'':a };
+    }
   });
 
   renderStandings();
@@ -88,181 +86,246 @@ window.addEventListener('DOMContentLoaded',async()=>{
   renderBracket();
 });
 
-function showTab(tab){
-  ['standings','qualified','bracket'].forEach(t=>{
-    document.getElementById('tab-'+t).style.display=t===tab?'block':'none';
+function showTab(tab) {
+  ['standings','qualified','bracket'].forEach(t => {
+    document.getElementById('tab-'+t).style.display = t===tab ? 'block' : 'none';
   });
-  document.querySelectorAll('.tab-btn').forEach((b,i)=>{
-    b.classList.toggle('active',['standings','qualified','bracket'][i]===tab);
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    b.classList.toggle('active', ['standings','qualified','bracket'][i]===tab);
   });
 }
 
-function renderStandings(){
-  const grouped=calcStandings(myScores);
-  let html='';
-  Object.entries(grouped).forEach(([grp,teams])=>{
-    html+=`<div class="grp-hdr" style="background:var(--bg2)"><span class="grp g${grp}">${grp}</span>Grupo ${grp}</div>
+function renderStandings() {
+  const grouped = calcStandings(myScores);
+  let html = '';
+  Object.entries(grouped).forEach(([grp, teams]) => {
+    html += `<div class="grp-hdr" style="background:var(--bg2)"><span class="grp g${grp}">${grp}</span>Grupo ${grp}</div>
     <table class="standings-table" style="margin-bottom:16px">
     <thead><tr><th>EQUIPO</th><th>PJ</th><th>PG</th><th>PE</th><th>PP</th><th>GF</th><th>GC</th><th>DIF</th><th>PTS</th></tr></thead><tbody>`;
-    teams.forEach((t,i)=>{
-      const cls=i===0?'q1':i===1?'q2':i===2?'q3':'';
-      const icon=i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
-      html+=`<tr class="${cls}"><td>${icon} ${t.team}</td><td>${t.pj}</td><td>${t.pg}</td><td>${t.pe}</td><td>${t.pp}</td><td>${t.gf}</td><td>${t.gc}</td><td>${t.dif>0?'+'+t.dif:t.dif}</td><td><strong>${t.pts}</strong></td></tr>`;
+    teams.forEach((t,i) => {
+      const cls = i===0?'q1':i===1?'q2':i===2?'q3':'';
+      const icon = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+      html += `<tr class="${cls}"><td>${icon} ${t.team}</td><td>${t.pj}</td><td>${t.pg}</td><td>${t.pe}</td><td>${t.pp}</td><td>${t.gf}</td><td>${t.gc}</td><td>${t.dif>0?'+'+t.dif:t.dif}</td><td><strong>${t.pts}</strong></td></tr>`;
     });
-    html+='</tbody></table>';
+    html += '</tbody></table>';
   });
-  document.getElementById('standingsContainer').innerHTML=html||'<p class="text-gray">Ingresa predicciones de grupos primero.</p>';
+  document.getElementById('standingsContainer').innerHTML = html || '<p class="text-gray">Ingresa predicciones de grupos primero.</p>';
 }
 
-function renderQualified(){
-  const grouped=calcStandings(myScores);
-  const q=getQualified(grouped);
-  r32teams=buildR32(q);
-  let html='<div class="qualified-grid">';
-  Object.keys(GROUPS).forEach(grp=>{
-    html+=`<div class="qualified-card">
+function renderQualified() {
+  const grouped = calcStandings(myScores);
+  const q = getQualified(grouped);
+  r32teams = buildR32(q);
+  let html = '<div class="qualified-grid">';
+  Object.keys(GROUPS).forEach(grp => {
+    html += `<div class="qualified-card">
       <div class="grp-label"><span class="grp g${grp}">${grp}</span> Grupo ${grp}</div>
       <div class="qualified-team first">🥇 ${q.firsts[grp]||'?'}</div>
       <div class="qualified-team second">🥈 ${q.seconds[grp]||'?'}</div>
     </div>`;
   });
-  html+='</div>';
-  document.getElementById('qualifiedContainer').innerHTML=html;
-  let t3html='<div class="qualified-grid">';
-  q.thirds.forEach((t,i)=>{
-    t3html+=`<div class="qualified-card">
+  html += '</div>';
+  document.getElementById('qualifiedContainer').innerHTML = html;
+  let t3 = '<div class="qualified-grid">';
+  q.thirds.forEach((t,i) => {
+    t3 += `<div class="qualified-card">
       <div class="grp-label">#${i+1} mejor 3° · Grupo ${t.group}</div>
       <div class="qualified-team third">⚡ ${t.team} (${t.pts}pts, ${t.dif>=0?'+'+t.dif:t.dif} dif)</div>
     </div>`;
   });
-  t3html+='</div>';
-  document.getElementById('thirdsContainer').innerHTML=t3html;
+  document.getElementById('thirdsContainer').innerHTML = t3 + '</div>';
 }
 
-// ── BRACKET RENDERING ─────────────────────────────────────────
-// KEY FIX: We render inputs once and NEVER re-render while user types.
-// Values are read from DOM on save. No onchange/oninput re-render.
-
-function renderBracket(){
-  const phaseMsg=document.getElementById('bracketPhaseMsg');
-  phaseMsg.textContent=phase===1
-    ? '🎯 Fase 1: Ingresa los marcadores de cada partido eliminatorio y guarda. El bracket avanza solo.'
-    : '🔄 Fase 2: Clasificados reales ya visibles. Reingresar resultados da menos puntos.';
-
-  const grouped=calcStandings(myScores);
-  const q=getQualified(grouped);
-  r32teams=buildR32(q);
-  const bracket=buildKnockoutBracket(r32teams,myElimScores);
-  renderBracketHTML(bracket);
+// ── KEY ENGINE: getWinner uses integers ──────────────────────────
+function getWinnerTeam(matchId, home, away) {
+  const s = myElimScores[matchId];
+  if (!s || s.home==='' || s.home===null || s.home===undefined) return null;
+  const h = parseInt(s.home), a = parseInt(s.away);
+  if (isNaN(h) || isNaN(a)) return null;
+  return h >= a ? home : away; // home wins ties (simplified)
 }
 
-function inputVal(matchId, side){
-  // Read from myElimScores (already saved) or DOM if exists
-  const domEl=document.getElementById((side==='home'?'bh':'ba')+matchId);
-  if(domEl) return domEl.value;
-  const s=myElimScores[matchId];
-  if(!s) return '';
-  return side==='home'?s.home:s.away;
+function buildFullBracket() {
+  const grouped = calcStandings(myScores);
+  const q = getQualified(grouped);
+  r32teams = buildR32(q);
+
+  // R32 — 16 matches, ids 71-86
+  const r32 = r32teams.map(m => {
+    const w = getWinnerTeam(m.id, m.home, m.away);
+    const s = myElimScores[m.id] || {};
+    return { ...m, winner: w, h: s.home, a: s.away };
+  });
+
+  // R16 — 8 matches, ids 87-94
+  const r16pairs = [
+    [r32[0], r32[1]], [r32[2], r32[3]],
+    [r32[4], r32[5]], [r32[6], r32[7]],
+    [r32[8], r32[9]], [r32[10],r32[11]],
+    [r32[12],r32[13]],[r32[14],r32[15]],
+  ];
+  const r16 = r16pairs.map(([a, b], i) => {
+    const id = 87 + i;
+    const home = a.winner || '?', away = b.winner || '?';
+    const w = getWinnerTeam(id, home, away);
+    const s = myElimScores[id] || {};
+    return { id, home, away, winner: w, h: s.home, a: s.away };
+  });
+
+  // QF — 4 matches, ids 95-98
+  const qfPairs = [
+    [r16[0], r16[1]], [r16[2], r16[3]],
+    [r16[4], r16[5]], [r16[6], r16[7]],
+  ];
+  const qf = qfPairs.map(([a, b], i) => {
+    const id = 95 + i;
+    const home = a.winner || '?', away = b.winner || '?';
+    const w = getWinnerTeam(id, home, away);
+    const s = myElimScores[id] || {};
+    return { id, home, away, winner: w, h: s.home, a: s.away };
+  });
+
+  // SF — 2 matches, ids 99-100
+  const sfPairs = [[qf[0], qf[1]], [qf[2], qf[3]]];
+  const sf = sfPairs.map(([a, b], i) => {
+    const id = 99 + i;
+    const home = a.winner || '?', away = b.winner || '?';
+    const w = getWinnerTeam(id, home, away);
+    const loser = w ? (w===home ? away : home) : null;
+    const s = myElimScores[id] || {};
+    return { id, home, away, winner: w, loser, h: s.home, a: s.away };
+  });
+
+  // Final — id 101
+  const finalHome = sf[0].winner || '?', finalAway = sf[1].winner || '?';
+  const finalW = getWinnerTeam(101, finalHome, finalAway);
+  const finalS = myElimScores[101] || {};
+  const final = { id: 101, home: finalHome, away: finalAway, winner: finalW, h: finalS.home, a: finalS.away };
+
+  // 3rd — id 102
+  const thirdHome = sf[0].loser || '?', thirdAway = sf[1].loser || '?';
+  const thirdW = getWinnerTeam(102, thirdHome, thirdAway);
+  const thirdS = myElimScores[102] || {};
+  const third = { id: 102, home: thirdHome, away: thirdAway, winner: thirdW, h: thirdS.home, a: thirdS.away };
+
+  return { r32, r16, qf, sf, final, third };
 }
 
-function matchBox(m, editable=true){
-  const s=myElimScores[m.id]||{};
-  const hv=s.home!==undefined&&s.home!==null?s.home:'';
-  const av=s.away!==undefined&&s.away!==null?s.away:'';
-  const hWin=m.winner&&m.winner===m.home;
-  const aWin=m.winner&&m.winner===m.away;
-  const done=!!m.winner;
+// ── RENDER ───────────────────────────────────────────────────────
+function renderBracket() {
+  const msg = document.getElementById('bracketPhaseMsg');
+  msg.textContent = phase===1
+    ? '🎯 Fase 1: Llena los resultados de la Ronda de 32 y guarda. Los ganadores pasan solos.'
+    : '🔄 Fase 2: Clasificados reales ya disponibles. Tus nuevas predicciones dan menos puntos.';
 
-  if(editable){
-    return `<div class="bracket-match ${done?'done':''}">
-      <div class="bracket-team ${hWin?'winner':''}">
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.home||'?'}</span>
-        <input class="bracket-input" type="number" min="0" max="20" id="bh${m.id}" value="${hv}" placeholder="—">
-      </div>
-      <div class="bracket-team ${aWin?'winner':''}">
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.away||'?'}</span>
-        <input class="bracket-input" type="number" min="0" max="20" id="ba${m.id}" value="${av}" placeholder="—">
-      </div>
-    </div>`;
-  }
-  return `<div class="bracket-match ${done?'done':''}">
-    <div class="bracket-team ${hWin?'winner':''}"><span>${m.home||'?'}</span><span class="bracket-score">${hv}</span></div>
-    <div class="bracket-team ${aWin?'winner':''}"><span>${m.away||'?'}</span><span class="bracket-score">${av}</span></div>
+  const bracket = buildFullBracket();
+  drawBracket(bracket);
+}
+
+function matchBox(m) {
+  const hv = (m.h !== undefined && m.h !== null && m.h !== '') ? m.h : '';
+  const av = (m.a !== undefined && m.a !== null && m.a !== '') ? m.a : '';
+  const hWin = m.winner && m.winner === m.home && m.home !== '?';
+  const aWin = m.winner && m.winner === m.away && m.away !== '?';
+  const done = !!m.winner;
+  return `
+  <div class="bracket-match ${done?'done':''}">
+    <div class="bracket-team ${hWin?'winner':''}">
+      <span style="flex:1;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${m.home||'?'}</span>
+      <input class="bracket-input" type="number" min="0" max="20" id="bh${m.id}" value="${hv}" placeholder="—">
+    </div>
+    <div class="bracket-team ${aWin?'winner':''}">
+      <span style="flex:1;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${m.away||'?'}</span>
+      <input class="bracket-input" type="number" min="0" max="20" id="ba${m.id}" value="${av}" placeholder="—">
+    </div>
   </div>`;
 }
 
-function renderBracketHTML(bracket){
-  const rounds=[
-    {label:'Ronda de 32<br><small>28 Jun–2 Jul</small>', matches:bracket.r32},
-    {label:'Octavos<br><small>6–9 Jul</small>',          matches:bracket.r16},
-    {label:'Cuartos<br><small>11–12 Jul</small>',        matches:bracket.qf},
-    {label:'Semis<br><small>15–16 Jul</small>',          matches:bracket.sf},
+function drawBracket(bracket) {
+  const rounds = [
+    { label: 'Ronda de 32<br><small style="color:var(--gray)">28 Jun–2 Jul</small>', matches: bracket.r32 },
+    { label: 'Octavos<br><small style="color:var(--gray)">6–9 Jul</small>',          matches: bracket.r16 },
+    { label: 'Cuartos<br><small style="color:var(--gray)">11–12 Jul</small>',        matches: bracket.qf },
+    { label: 'Semis<br><small style="color:var(--gray)">15–16 Jul</small>',          matches: bracket.sf },
   ];
-  let html='';
-  rounds.forEach(round=>{
-    html+=`<div class="bracket-round"><h3>${round.label}</h3><div class="bracket-matches">`;
-    round.matches.forEach(m=>{ html+=matchBox(m,true); });
-    html+='</div></div>';
+
+  let html = '';
+  rounds.forEach(round => {
+    html += `<div class="bracket-round"><h3>${round.label}</h3><div class="bracket-matches">`;
+    round.matches.forEach(m => { html += matchBox(m); });
+    html += '</div></div>';
   });
 
-  // Final + 3P
-  html+=`<div class="bracket-round"><h3>Final & 3er<br><small>18–19 Jul</small></h3><div class="bracket-matches">
-    <div style="font-size:.72rem;color:var(--gold);text-align:center;margin-bottom:4px">🏆 FINAL</div>
-    ${matchBox(bracket.final,true)}
-    <div style="font-size:.72rem;color:var(--gray);text-align:center;margin:8px 0 4px">🥉 3er PUESTO</div>
-    ${matchBox(bracket.third,true)}
-    <div style="margin-top:12px;text-align:center;padding:12px;background:${bracket.final.winner?'#1a1000':'var(--bg2)'};border-radius:8px;border:2px solid ${bracket.final.winner?'var(--gold)':'var(--border)'}">
-      <div style="font-size:1.4rem">🏆</div>
-      <div style="color:var(--gold);font-weight:700">${bracket.final.winner||'Pendiente'}</div>
-      <div style="color:var(--gray);font-size:.72rem">Tu campeón predicho</div>
+  // Final + 3P + Champion
+  const champ = bracket.final.winner;
+  html += `
+  <div class="bracket-round">
+    <h3>Final & 3er<br><small style="color:var(--gray)">18–19 Jul</small></h3>
+    <div class="bracket-matches">
+      <div style="font-size:.72rem;color:var(--gold);text-align:center;padding:4px 0">🏆 FINAL</div>
+      ${matchBox(bracket.final)}
+      <div style="font-size:.72rem;color:var(--gray);text-align:center;padding:8px 0 4px">🥉 3er PUESTO</div>
+      ${matchBox(bracket.third)}
+      <div style="margin-top:14px;text-align:center;padding:16px 12px;
+           background:${champ?'#1a1000':'var(--bg2)'};border-radius:10px;
+           border:2px solid ${champ?'var(--gold)':'var(--border)'}">
+        <div style="font-size:2rem">🏆</div>
+        <div style="color:var(--gold);font-weight:700;font-size:1.1rem">${champ||'Pendiente'}</div>
+        <div style="color:var(--gray);font-size:.72rem;margin-top:2px">Tu campeón predicho</div>
+      </div>
     </div>
-  </div></div>`;
+  </div>`;
 
-  document.getElementById('bracketContainer').innerHTML=html;
+  document.getElementById('bracketContainer').innerHTML = html;
 }
 
-// ── SAVE: read all inputs from DOM, save to DB, then re-render ──
-async function saveBracket(){
-  const btn=document.getElementById('saveBracketBtn');
-  btn.disabled=true; btn.textContent='Guardando...';
+// ── COLLECT inputs from DOM → save to myElimScores → save DB → re-render ──
+async function collectAndSave() {
+  const btn = document.querySelector('button[onclick="collectAndSave()"]');
+  btn.disabled = true; btn.textContent = 'Guardando...';
 
-  // Collect ALL bracket input values from DOM right now
-  const allIds=[...r32teams.map(m=>m.id), 87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102];
-  allIds.forEach(id=>{
-    const hEl=document.getElementById('bh'+id);
-    const aEl=document.getElementById('ba'+id);
-    if(hEl&&hEl.value!==''){
-      myElimScores[id]={home:parseInt(hEl.value)||0, away:parseInt(aEl?.value)||0};
+  // Step 1: collect ALL current input values from DOM into myElimScores
+  const bracket = buildFullBracket();
+  const allMatches = [
+    ...bracket.r32, ...bracket.r16, ...bracket.qf, ...bracket.sf,
+    bracket.final, bracket.third
+  ];
+
+  allMatches.forEach(m => {
+    const hEl = document.getElementById('bh' + m.id);
+    const aEl = document.getElementById('ba' + m.id);
+    if (hEl && hEl.value !== '') {
+      const h = parseInt(hEl.value), a = parseInt(aEl?.value ?? '0');
+      if (!isNaN(h) && !isNaN(a)) {
+        myElimScores[m.id] = { home: h, away: a };
+      }
     }
   });
 
-  try{
-    const preds=allIds.map(id=>{
-      const s=myElimScores[id];
-      if(!s||s.home===''||s.home===undefined||s.home===null) return null;
-      const h=parseInt(s.home), a=parseInt(s.away);
-      if(isNaN(h)||isNaN(a)) return null;
-      return{match_id:id, home_score:h, away_score:a, phase};
+  // Step 2: save to Supabase
+  try {
+    const preds = Object.entries(myElimScores).map(([id, s]) => {
+      const h = parseInt(s.home), a = parseInt(s.away);
+      if (isNaN(h) || isNaN(a)) return null;
+      return { match_id: parseInt(id), home_score: h, away_score: a, phase };
     }).filter(Boolean);
 
     await dbSavePredictions(participant.id, preds);
-    document.getElementById('bracketSaveMsg').innerHTML='<div class="alert alert-success">✅ ¡Guardado! El bracket se actualizó.</div>';
-
-    // NOW re-render with saved values
-    const grouped=calcStandings(myScores);
-    const q=getQualified(grouped);
-    r32teams=buildR32(q);
-    const bracket=buildKnockoutBracket(r32teams,myElimScores);
-    renderBracketHTML(bracket);
-
-    setTimeout(()=>{
-      document.getElementById('bracketSaveMsg').innerHTML='';
-    },3000);
-  }catch(e){
-    document.getElementById('bracketSaveMsg').innerHTML=`<div class="alert alert-error">❌ ${e.message}</div>`;
+    document.getElementById('bracketSaveMsg').innerHTML =
+      '<div class="alert alert-success">✅ ¡Guardado! Los ganadores avanzan automáticamente.</div>';
+    setTimeout(() => {
+      document.getElementById('bracketSaveMsg').innerHTML = '';
+    }, 3000);
+  } catch(e) {
+    document.getElementById('bracketSaveMsg').innerHTML =
+      `<div class="alert alert-error">❌ Error: ${e.message}</div>`;
   }
 
-  btn.disabled=false; btn.textContent='💾 Guardar y actualizar bracket';
+  // Step 3: re-render with updated scores (winners now calculated correctly)
+  const updated = buildFullBracket();
+  drawBracket(updated);
+
+  btn.disabled = false; btn.textContent = '💾 Guardar y avanzar bracket';
 }
 </script>
 </body></html>
