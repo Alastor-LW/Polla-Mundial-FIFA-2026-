@@ -20,14 +20,14 @@
   </div>
   <div id="mainContent" style="display:none">
     <div class="tabs">
-      <button class="tab-btn active" onclick="showTab('standings')">📊 Posiciones de Grupos</button>
+      <button class="tab-btn active" onclick="showTab('standings')">📊 Posiciones</button>
       <button class="tab-btn" onclick="showTab('qualified')">✅ Clasificados (32)</button>
-      <button class="tab-btn" onclick="showTab('bracket')">🔱 Bracket Eliminatorio</button>
+      <button class="tab-btn" onclick="showTab('bracket')">🔱 Bracket</button>
     </div>
 
     <!-- STANDINGS -->
     <div id="tab-standings">
-      <div class="alert alert-info" style="font-size:.82rem">📐 Calculado automáticamente con tus predicciones de partidos. Los puntos se suman conforme ingresas resultados.</div>
+      <div class="alert alert-info" style="font-size:.82rem">📐 Calculado automáticamente con tus predicciones de grupos.</div>
       <div id="standingsContainer"><div class="loading"><div class="spinner"></div></div></div>
     </div>
 
@@ -36,10 +36,10 @@
       <div class="card">
         <h2>✅ Los 32 clasificados según tus predicciones</h2>
         <p class="text-gray" style="font-size:.82rem;margin-bottom:14px">🥇 Primeros · 🥈 Segundos · ⚡ Mejores terceros</p>
-        <div id="qualifiedContainer"><div class="loading"><div class="spinner"></div></div></div>
+        <div id="qualifiedContainer"></div>
       </div>
-      <div class="card" id="thirdsCard">
-        <h2>⚡ 8 Mejores Terceros clasificados</h2>
+      <div class="card">
+        <h2>⚡ 8 Mejores Terceros</h2>
         <div id="thirdsContainer"></div>
       </div>
     </div>
@@ -48,10 +48,16 @@
     <div id="tab-bracket" style="display:none">
       <div class="alert alert-warn" id="bracketPhaseMsg" style="font-size:.82rem"></div>
       <div id="bracketSaveMsg"></div>
-      <div class="bracket-wrap" style="overflow-x:auto;overflow-y:visible;">
-        <div class="bracket" id="bracketContainer" style="align-items:flex-start;"><div class="loading"><div class="spinner"></div></div></div>
+      <p class="text-gray" style="font-size:.82rem;margin-bottom:12px">
+        💡 Ingresa los resultados y haz clic en <strong>"Guardar"</strong> para ver el bracket avanzar.
+      </p>
+      <div class="bracket-wrap">
+        <div class="bracket" id="bracketContainer" style="align-items:flex-start;"></div>
       </div>
-      <button class="btn btn-gold btn-block mt-16" id="saveBracketBtn" onclick="saveBracket()" style="display:none">💾 Guardar predicciones eliminatorias</button>
+      <button class="btn btn-gold btn-block mt-16" id="saveBracketBtn" onclick="saveBracket()">
+        💾 Guardar y actualizar bracket
+      </button>
+      <p class="text-gray text-center mt-8" style="font-size:.78rem">Los resultados se guardan y el bracket avanza automáticamente</p>
     </div>
   </div>
 </div>
@@ -105,15 +111,13 @@ function renderStandings(){
     });
     html+='</tbody></table>';
   });
-  document.getElementById('standingsContainer').innerHTML=html||'<p class="text-gray">Aún no has ingresado predicciones de partidos.</p>';
+  document.getElementById('standingsContainer').innerHTML=html||'<p class="text-gray">Ingresa predicciones de grupos primero.</p>';
 }
 
 function renderQualified(){
   const grouped=calcStandings(myScores);
   const q=getQualified(grouped);
   r32teams=buildR32(q);
-
-  // Grid of groups
   let html='<div class="qualified-grid">';
   Object.keys(GROUPS).forEach(grp=>{
     html+=`<div class="qualified-card">
@@ -124,136 +128,141 @@ function renderQualified(){
   });
   html+='</div>';
   document.getElementById('qualifiedContainer').innerHTML=html;
-
-  // Best thirds
   let t3html='<div class="qualified-grid">';
   q.thirds.forEach((t,i)=>{
     t3html+=`<div class="qualified-card">
       <div class="grp-label">#${i+1} mejor 3° · Grupo ${t.group}</div>
-      <div class="qualified-team third">⚡ ${t.team} (${t.pts}pts, ${t.dif>0?'+'+t.dif:t.dif} dif)</div>
+      <div class="qualified-team third">⚡ ${t.team} (${t.pts}pts, ${t.dif>=0?'+'+t.dif:t.dif} dif)</div>
     </div>`;
   });
   t3html+='</div>';
   document.getElementById('thirdsContainer').innerHTML=t3html;
 }
 
+// ── BRACKET RENDERING ─────────────────────────────────────────
+// KEY FIX: We render inputs once and NEVER re-render while user types.
+// Values are read from DOM on save. No onchange/oninput re-render.
+
 function renderBracket(){
   const phaseMsg=document.getElementById('bracketPhaseMsg');
-  const saveBtn=document.getElementById('saveBracketBtn');
-  if(phase===1){
-    phaseMsg.textContent='🎯 Fase 1: Ingresa los resultados de cada partido eliminatorio. El bracket avanza automáticamente según quién gana.';
-    saveBtn.style.display='block';
-  } else {
-    phaseMsg.className='alert alert-warn';
-    phaseMsg.textContent='🔄 Fase 2: Los clasificados son los reales. Puedes reingresar resultados eliminatorios. Penalización aplicada automáticamente.';
-    saveBtn.style.display='block';
-  }
+  phaseMsg.textContent=phase===1
+    ? '🎯 Fase 1: Ingresa los marcadores de cada partido eliminatorio y guarda. El bracket avanza solo.'
+    : '🔄 Fase 2: Clasificados reales ya visibles. Reingresar resultados da menos puntos.';
 
   const grouped=calcStandings(myScores);
   const q=getQualified(grouped);
   r32teams=buildR32(q);
   const bracket=buildKnockoutBracket(r32teams,myElimScores);
-
   renderBracketHTML(bracket);
 }
 
-function matchBox(m, editable=true, phase=1){
+function inputVal(matchId, side){
+  // Read from myElimScores (already saved) or DOM if exists
+  const domEl=document.getElementById((side==='home'?'bh':'ba')+matchId);
+  if(domEl) return domEl.value;
+  const s=myElimScores[matchId];
+  if(!s) return '';
+  return side==='home'?s.home:s.away;
+}
+
+function matchBox(m, editable=true){
   const s=myElimScores[m.id]||{};
-  const hScore=s.home!==undefined&&s.home!==null?s.home:'';
-  const aScore=s.away!==undefined&&s.away!==null?s.away:'';
+  const hv=s.home!==undefined&&s.home!==null?s.home:'';
+  const av=s.away!==undefined&&s.away!==null?s.away:'';
   const hWin=m.winner&&m.winner===m.home;
   const aWin=m.winner&&m.winner===m.away;
-  const done=m.winner!==null&&m.winner!==undefined;
+  const done=!!m.winner;
 
   if(editable){
     return `<div class="bracket-match ${done?'done':''}">
       <div class="bracket-team ${hWin?'winner':''}">
-        <span>${m.home||'?'}</span>
-        <input class="bracket-input" type="number" min="0" max="20" id="bh${m.id}" value="${hScore}" placeholder="—" oninput="updateBracket()" style="pointer-events:auto;position:relative;z-index:10;">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.home||'?'}</span>
+        <input class="bracket-input" type="number" min="0" max="20" id="bh${m.id}" value="${hv}" placeholder="—">
       </div>
       <div class="bracket-team ${aWin?'winner':''}">
-        <span>${m.away||'?'}</span>
-        <input class="bracket-input" type="number" min="0" max="20" id="ba${m.id}" value="${aScore}" placeholder="—" oninput="updateBracket()" style="pointer-events:auto;position:relative;z-index:10;">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.away||'?'}</span>
+        <input class="bracket-input" type="number" min="0" max="20" id="ba${m.id}" value="${av}" placeholder="—">
       </div>
     </div>`;
-  } else {
-    return `<div class="bracket-match ${done?'done':''}">
-      <div class="bracket-team ${hWin?'winner':''}"><span>${m.home||'?'}</span><span class="bracket-score">${hScore}</span></div>
-      <div class="bracket-team ${aWin?'winner':''}"><span>${m.away||'?'}</span><span class="bracket-score">${aScore}</span></div>
-    </div>`;
   }
+  return `<div class="bracket-match ${done?'done':''}">
+    <div class="bracket-team ${hWin?'winner':''}"><span>${m.home||'?'}</span><span class="bracket-score">${hv}</span></div>
+    <div class="bracket-team ${aWin?'winner':''}"><span>${m.away||'?'}</span><span class="bracket-score">${av}</span></div>
+  </div>`;
 }
 
 function renderBracketHTML(bracket){
   const rounds=[
-    {label:'Ronda de 32\n28 Jun–2 Jul', matches:bracket.r32},
-    {label:'Octavos\n6–9 Jul',          matches:bracket.r16},
-    {label:'Cuartos\n11–12 Jul',        matches:bracket.qf},
-    {label:'Semifinales\n15–16 Jul',    matches:bracket.sf},
+    {label:'Ronda de 32<br><small>28 Jun–2 Jul</small>', matches:bracket.r32},
+    {label:'Octavos<br><small>6–9 Jul</small>',          matches:bracket.r16},
+    {label:'Cuartos<br><small>11–12 Jul</small>',        matches:bracket.qf},
+    {label:'Semis<br><small>15–16 Jul</small>',          matches:bracket.sf},
   ];
-
   let html='';
   rounds.forEach(round=>{
-    html+=`<div class="bracket-round"><h3>${round.label.replace('\n','<br>')}</h3><div class="bracket-matches">`;
-    round.matches.forEach(m=>{ html+=matchBox(m,true,phase); });
+    html+=`<div class="bracket-round"><h3>${round.label}</h3><div class="bracket-matches">`;
+    round.matches.forEach(m=>{ html+=matchBox(m,true); });
     html+='</div></div>';
   });
 
-  // Final + 3rd
-  html+=`<div class="bracket-round"><h3>Final & 3er Puesto<br>18–19 Jul</h3><div class="bracket-matches">`;
-  html+=`<div style="text-align:center;font-size:.75rem;color:var(--gold);margin-bottom:4px">🏆 FINAL</div>`;
-  html+=matchBox(bracket.final,true,phase);
-  html+=`<div style="text-align:center;font-size:.75rem;color:var(--gray);margin:8px 0 4px">🥉 3er PUESTO</div>`;
-  html+=matchBox(bracket.third,true,phase);
-
-  // Champion display
-  const champ=bracket.final.winner;
-  html+=`<div style="margin-top:16px;text-align:center;padding:14px;background:${champ?'#1a1000':'var(--bg2)'};border-radius:8px;border:2px solid ${champ?'var(--gold)':'var(--border)'}">
-    <div style="font-size:1.6rem">🏆</div>
-    <div style="color:var(--gold);font-weight:700;font-size:1rem">${champ||'Campeón pendiente'}</div>
-    <div style="color:var(--gray);font-size:.75rem">Tu campeón predicho</div>
-  </div>`;
-  html+='</div></div>';
+  // Final + 3P
+  html+=`<div class="bracket-round"><h3>Final & 3er<br><small>18–19 Jul</small></h3><div class="bracket-matches">
+    <div style="font-size:.72rem;color:var(--gold);text-align:center;margin-bottom:4px">🏆 FINAL</div>
+    ${matchBox(bracket.final,true)}
+    <div style="font-size:.72rem;color:var(--gray);text-align:center;margin:8px 0 4px">🥉 3er PUESTO</div>
+    ${matchBox(bracket.third,true)}
+    <div style="margin-top:12px;text-align:center;padding:12px;background:${bracket.final.winner?'#1a1000':'var(--bg2)'};border-radius:8px;border:2px solid ${bracket.final.winner?'var(--gold)':'var(--border)'}">
+      <div style="font-size:1.4rem">🏆</div>
+      <div style="color:var(--gold);font-weight:700">${bracket.final.winner||'Pendiente'}</div>
+      <div style="color:var(--gray);font-size:.72rem">Tu campeón predicho</div>
+    </div>
+  </div></div>`;
 
   document.getElementById('bracketContainer').innerHTML=html;
 }
 
-let updateTimer=null;
-function updateBracket(){
-  // Collect current values without re-rendering yet
-  const allElimIds=[...r32teams.map(m=>m.id),...[87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102]];
-  allElimIds.forEach(id=>{
-    const h=document.getElementById('bh'+id)?.value;
-    const a=document.getElementById('ba'+id)?.value;
-    myElimScores[id]={home:h??'',away:a??''};
+// ── SAVE: read all inputs from DOM, save to DB, then re-render ──
+async function saveBracket(){
+  const btn=document.getElementById('saveBracketBtn');
+  btn.disabled=true; btn.textContent='Guardando...';
+
+  // Collect ALL bracket input values from DOM right now
+  const allIds=[...r32teams.map(m=>m.id), 87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102];
+  allIds.forEach(id=>{
+    const hEl=document.getElementById('bh'+id);
+    const aEl=document.getElementById('ba'+id);
+    if(hEl&&hEl.value!==''){
+      myElimScores[id]={home:parseInt(hEl.value)||0, away:parseInt(aEl?.value)||0};
+    }
   });
-  // Debounce: only re-render 800ms after user stops typing
-  clearTimeout(updateTimer);
-  updateTimer=setTimeout(()=>{
+
+  try{
+    const preds=allIds.map(id=>{
+      const s=myElimScores[id];
+      if(!s||s.home===''||s.home===undefined||s.home===null) return null;
+      const h=parseInt(s.home), a=parseInt(s.away);
+      if(isNaN(h)||isNaN(a)) return null;
+      return{match_id:id, home_score:h, away_score:a, phase};
+    }).filter(Boolean);
+
+    await dbSavePredictions(participant.id, preds);
+    document.getElementById('bracketSaveMsg').innerHTML='<div class="alert alert-success">✅ ¡Guardado! El bracket se actualizó.</div>';
+
+    // NOW re-render with saved values
     const grouped=calcStandings(myScores);
     const q=getQualified(grouped);
     r32teams=buildR32(q);
     const bracket=buildKnockoutBracket(r32teams,myElimScores);
     renderBracketHTML(bracket);
-  },800);
-}
 
-async function saveBracket(){
-  const btn=document.getElementById('saveBracketBtn');
-  btn.disabled=true;btn.textContent='Guardando...';
-  try{
-    const allIds=[...r32teams.map(m=>m.id),...[87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102]];
-    const preds=allIds.map(id=>{
-      const s=myElimScores[id];
-      if(!s||s.home===''||s.home===undefined) return null;
-      return{match_id:id,home_score:parseInt(s.home),away_score:parseInt(s.away),phase};
-    }).filter(p=>p&&!isNaN(p.home_score));
-    await dbSavePredictions(participant.id,preds);
-    document.getElementById('bracketSaveMsg').innerHTML='<div class="alert alert-success">✅ Bracket guardado correctamente</div>';
+    setTimeout(()=>{
+      document.getElementById('bracketSaveMsg').innerHTML='';
+    },3000);
   }catch(e){
     document.getElementById('bracketSaveMsg').innerHTML=`<div class="alert alert-error">❌ ${e.message}</div>`;
   }
-  btn.disabled=false;btn.textContent='💾 Guardar predicciones eliminatorias';
+
+  btn.disabled=false; btn.textContent='💾 Guardar y actualizar bracket';
 }
 </script>
 </body></html>
