@@ -48,8 +48,8 @@
     <div id="tab-bracket" style="display:none">
       <div class="alert alert-warn" id="bracketPhaseMsg" style="font-size:.82rem"></div>
       <div id="bracketSaveMsg"></div>
-      <div class="bracket-wrap">
-        <div class="bracket" id="bracketContainer"><div class="loading"><div class="spinner"></div></div></div>
+      <div class="bracket-wrap" style="overflow-x:auto;overflow-y:visible;">
+        <div class="bracket" id="bracketContainer" style="align-items:flex-start;"><div class="loading"><div class="spinner"></div></div></div>
       </div>
       <button class="btn btn-gold btn-block mt-16" id="saveBracketBtn" onclick="saveBracket()" style="display:none">💾 Guardar predicciones eliminatorias</button>
     </div>
@@ -169,11 +169,11 @@ function matchBox(m, editable=true, phase=1){
     return `<div class="bracket-match ${done?'done':''}">
       <div class="bracket-team ${hWin?'winner':''}">
         <span>${m.home||'?'}</span>
-        <input class="bracket-input" type="number" min="0" max="20" id="bh${m.id}" value="${hScore}" placeholder="—" onchange="updateBracket()">
+        <input class="bracket-input" type="number" min="0" max="20" id="bh${m.id}" value="${hScore}" placeholder="—" oninput="updateBracket()" style="pointer-events:auto;position:relative;z-index:10;">
       </div>
       <div class="bracket-team ${aWin?'winner':''}">
         <span>${m.away||'?'}</span>
-        <input class="bracket-input" type="number" min="0" max="20" id="ba${m.id}" value="${aScore}" placeholder="—" onchange="updateBracket()">
+        <input class="bracket-input" type="number" min="0" max="20" id="ba${m.id}" value="${aScore}" placeholder="—" oninput="updateBracket()" style="pointer-events:auto;position:relative;z-index:10;">
       </div>
     </div>`;
   } else {
@@ -218,19 +218,24 @@ function renderBracketHTML(bracket){
   document.getElementById('bracketContainer').innerHTML=html;
 }
 
+let updateTimer=null;
 function updateBracket(){
-  // Read current inputs and rebuild bracket live
+  // Collect current values without re-rendering yet
   const allElimIds=[...r32teams.map(m=>m.id),...[87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102]];
   allElimIds.forEach(id=>{
     const h=document.getElementById('bh'+id)?.value;
     const a=document.getElementById('ba'+id)?.value;
-    if(h!==null&&h!=='') myElimScores[id]={home:h,away:a};
+    myElimScores[id]={home:h??'',away:a??''};
   });
-  const grouped=calcStandings(myScores);
-  const q=getQualified(grouped);
-  r32teams=buildR32(q);
-  const bracket=buildKnockoutBracket(r32teams,myElimScores);
-  renderBracketHTML(bracket);
+  // Debounce: only re-render 800ms after user stops typing
+  clearTimeout(updateTimer);
+  updateTimer=setTimeout(()=>{
+    const grouped=calcStandings(myScores);
+    const q=getQualified(grouped);
+    r32teams=buildR32(q);
+    const bracket=buildKnockoutBracket(r32teams,myElimScores);
+    renderBracketHTML(bracket);
+  },800);
 }
 
 async function saveBracket(){
