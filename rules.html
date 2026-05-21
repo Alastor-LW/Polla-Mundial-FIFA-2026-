@@ -1,165 +1,57 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!DOCTYPE html><html lang="es"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Reglas · Polla Mundial 2026</title>
 <link rel="stylesheet" href="css/style.css">
-</head>
-<body>
-<div class="hero" style="padding:24px">
-  <h1 style="font-size:1.6rem">📋 Reglas de la Polla</h1>
-  <p class="subtitle">Léelas con atención antes de participar</p>
-</div>
-<nav>
-  <a href="index.html">🏠 Inicio</a>
-  <a href="predictions.html">✏️ Predicciones</a>
-  <a href="leaderboard.html">🏆 Clasificación</a>
-  <a href="rules.html" class="active">📋 Reglas</a>
-</nav>
-
+</head><body>
+<div class="hero" style="padding:22px"><h1 style="font-size:1.5rem">📋 Reglas</h1><p class="sub">Léelas con atención</p></div>
+<nav><a href="index.html">🏠 Inicio</a><a href="predictions.html">✏️ Predicciones</a><a href="bracket.html">🔱 Bracket</a><a href="leaderboard.html">🏆 Tabla</a><a href="rules.html" class="active">📋 Reglas</a></nav>
 <div class="container">
-
-  <div class="card">
-    <h2>💰 Inscripción y premios</h2>
-    <div class="rule-item">
-      <span class="rule-pts">$10</span>
-      <div class="rule-desc">Inscripción de <strong>$10 USD</strong> por participante
-        <small>El pago debe realizarse antes del inicio del torneo el 11 de junio de 2026</small>
-      </div>
-    </div>
-    <div class="rule-item">
-      <span class="rule-pts gold">65%</span>
-      <div class="rule-desc">Premio al <strong>1er lugar</strong>
-        <small>Con 20 inscritos = $130 USD</small>
-      </div>
-    </div>
-    <div class="rule-item">
-      <span class="rule-pts">35%</span>
-      <div class="rule-desc">Premio al <strong>2do lugar</strong>
-        <small>Con 20 inscritos = $70 USD</small>
-      </div>
+  <div class="card"><h2>💰 Inscripción y Premios</h2>
+    <div style="font-size:.9rem;line-height:2">
+      <div style="border-bottom:1px solid var(--border);padding:8px 0">Inscripción: <strong class="text-gold">$10 USD</strong> por persona · pago antes del 11 de junio</div>
+      <div style="border-bottom:1px solid var(--border);padding:8px 0">🥇 Primer lugar: <strong class="text-gold">65%</strong> del bote total</div>
+      <div style="padding:8px 0">🥈 Segundo lugar: <strong class="text-gold">35%</strong> del bote total</div>
     </div>
   </div>
-
-  <div class="card">
-    <h2>📅 Fases de la polla</h2>
-    <div class="rule-item">
-      <span class="rule-pts green">Fase 1</span>
-      <div class="rule-desc"><strong>Predicciones de grupos</strong>
-        <small>Predices resultados de los 70 partidos de fase de grupos y quién clasifica 1° y 2° en cada grupo. También predices campeón y subcampeón final.</small>
-        <small>⏰ Cierre: 11 de junio antes de las 3 PM ET (primer partido)</small>
-      </div>
-    </div>
-    <div class="rule-item">
-      <span class="rule-pts">Fase 2</span>
-      <div class="rule-desc"><strong>Rondas eliminatorias</strong>
-        <small>Puedes ajustar tus predicciones de clasificados y campeón una vez terminada la fase de grupos, pero con penalización de -2 pts por cada cambio.</small>
-        <small>⏰ Apertura: 30 de junio (inicio ronda de 32)</small>
-      </div>
+  <div class="card"><h2>📅 Fases</h2>
+    <div style="font-size:.9rem;line-height:1.8">
+      <p><strong class="text-accent">Fase 1</strong> — Antes del 11 de junio (3 PM ET). Predices los 70 partidos de grupos. El sistema calcula automáticamente quién clasifica y construye tu bracket eliminatorio. También predices todos los partidos eliminatorios hasta la final.</p>
+      <br><p><strong class="text-gold">Fase 2</strong> — Se activa cuando termina la fase de grupos (~30 de junio). Puedes reingresar tus predicciones eliminatorias ya con los clasificados reales visibles. Los puntos de Fase 2 valen menos porque tienes más información.</p>
     </div>
   </div>
-
-  <div class="card">
-    <h2>⚽ Puntos por partido (Fase de Grupos)</h2>
-    <div class="rule-item">
-      <span class="rule-pts">+3 pts</span>
-      <div class="rule-desc"><strong>Resultado exacto</strong>
-        <small>Predices 2-1 y el partido termina exactamente 2-1</small>
-      </div>
-    </div>
-    <div class="rule-item">
-      <span class="rule-pts">+1 pt</span>
-      <div class="rule-desc"><strong>Solo aciertas ganador o empate</strong>
-        <small>Predices 2-0 pero gana el mismo equipo 1-0. O predices empate 1-1 y termina 0-0.</small>
-      </div>
-    </div>
-    <div class="rule-item">
-      <span class="rule-pts red">0 pts</span>
-      <div class="rule-desc"><strong>Fallo total</strong>
-        <small>Predices que gana el equipo A pero gana el B, o no predijiste el partido</small>
-      </div>
+  <div class="card"><h2>⚽ Puntos Fase de Grupos</h2>
+    <div style="font-size:.9rem">
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span>Resultado exacto (ej: predices 2-1 y termina 2-1)</span><strong class="text-accent">+3 pts</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span>Solo aciertas ganador o empate</span><strong class="text-accent">+1 pt</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span>1° y 2° del grupo en orden exacto</span><strong class="text-green">+10 pts</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span>1° y 2° del grupo correctos pero invertidos</span><strong class="text-green">+6 pts</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0"><span>Acertaste 1 de los 2 clasificados (o el 3° correcto)</span><strong class="text-green">+3 pts</strong></div>
     </div>
   </div>
-
-  <div class="card">
-    <h2>📊 Puntos por clasificación de grupo</h2>
-    <p class="text-gray" style="font-size:0.85rem;margin-bottom:14px">Se evalúa al terminar los 3 partidos de cada grupo (12 grupos = 12 evaluaciones)</p>
-    <div class="rule-item">
-      <span class="rule-pts green">+10 pts</span>
-      <div class="rule-desc"><strong>1° y 2° en orden exacto</strong>
-        <small>Predijiste Brasil 1° y Marruecos 2° — y así terminó</small>
-      </div>
-    </div>
-    <div class="rule-item">
-      <span class="rule-pts green">+6 pts</span>
-      <div class="rule-desc"><strong>1° y 2° correctos pero invertidos</strong>
-        <small>Predijiste Brasil 1° y Marruecos 2° — pero terminó Marruecos 1° y Brasil 2°</small>
-      </div>
-    </div>
-    <div class="rule-item">
-      <span class="rule-pts green">+3 pts</span>
-      <div class="rule-desc"><strong>Acertaste solo uno de los dos</strong>
-        <small>Predijiste Brasil y Marruecos — y clasificó Brasil pero no Marruecos</small>
-      </div>
+  <div class="card"><h2>🔱 Puntos Eliminatorias</h2>
+    <p class="text-gray" style="font-size:.82rem;margin-bottom:12px">Aplica para R32, Octavos, Cuartos, Semis y Final</p>
+    <div style="font-size:.9rem">
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span>Fase 1 — Resultado exacto</span><strong class="text-gold">+8 pts</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span>Fase 1 — Solo clasificante correcto</span><strong class="text-gold">+5 pts</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span>Fase 1 — Fallo</span><strong class="text-red">-1 pt</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span>Fase 2 — Resultado exacto</span><strong class="text-accent">+5 pts</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span>Fase 2 — Solo clasificante correcto</span><strong class="text-accent">+3 pts</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span>Fase 2 — Fallo</span><strong class="text-red">-2 pts</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span>🏆 Campeón correcto Fase 1</span><strong class="text-gold">+40 pts</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span>🥈 Subcampeón correcto Fase 1</span><strong class="text-gold">+20 pts</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span>🏆 Campeón correcto Fase 2</span><strong class="text-accent">+20 pts</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0"><span>🥈 Subcampeón correcto Fase 2</span><strong class="text-accent">+10 pts</strong></div>
     </div>
   </div>
-
-  <div class="card">
-    <h2>🏆 Puntos por fases eliminatorias</h2>
-    <div class="rule-item">
-      <span class="rule-pts">+5 pts</span>
-      <div class="rule-desc"><strong>Aciertas el equipo que clasifica</strong>
-        <small>En cualquier partido eliminatorio (R32, octavos, cuartos, semis, final)</small>
-      </div>
-    </div>
-    <div class="rule-item">
-      <span class="rule-pts">+3 pts</span>
-      <div class="rule-desc"><strong>Bonus: resultado exacto</strong>
-        <small>Además de acertar el clasificante, aciertas el marcador exacto</small>
-      </div>
-    </div>
-    <div class="rule-item">
-      <span class="rule-pts gold">+20 pts</span>
-      <div class="rule-desc"><strong>Subcampeón del mundo</strong>
-        <small>El equipo que llega a la final y pierde</small>
-      </div>
-    </div>
-    <div class="rule-item">
-      <span class="rule-pts gold">+40 pts</span>
-      <div class="rule-desc"><strong>🏆 Campeón del mundo</strong>
-        <small>El premio gordo</small>
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>⚠️ Penalizaciones</h2>
-    <div class="rule-item">
-      <span class="rule-pts red">-2 pts</span>
-      <div class="rule-desc"><strong>Cambio de predicción en Fase 2</strong>
-        <small>Cada cambio que hagas a tus predicciones después del cierre de la Fase 1 cuesta 2 puntos. Piénsalo bien antes de cambiar.</small>
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>🤝 Reglas generales</h2>
-    <ul style="color:var(--gray);font-size:0.9rem;line-height:1.8;padding-left:18px">
-      <li>El torneo usa los resultados oficiales de la FIFA al final del tiempo reglamentario</li>
-      <li>En eliminatorias, los goles en tiempo extra y penales <strong>no cuentan</strong> para el marcador exacto</li>
-      <li>En caso de empate en puntos al final, se desempata por mayor número de resultados exactos</li>
+  <div class="card"><h2>📌 Reglas generales</h2>
+    <ul style="color:var(--gray);font-size:.88rem;line-height:2;padding-left:18px">
+      <li>Se usan resultados al final del tiempo reglamentario (90 min)</li>
+      <li>Goles en tiempo extra y penales NO cuentan para el marcador exacto</li>
+      <li>Empate en puntos finales se desempata por resultados exactos acertados</li>
       <li>El admin es la autoridad final en caso de disputa</li>
-      <li>Las predicciones se cierran automáticamente con el primer partido</li>
-      <li>No se aceptan pagos después del inicio del torneo</li>
+      <li>No se aceptan inscripciones después del primer partido</li>
     </ul>
   </div>
-
-  <div class="card" style="text-align:center">
-    <p class="text-gray" style="margin-bottom:16px">¿Listo para participar?</p>
-    <a href="predictions.html" class="btn btn-gold">✏️ Hacer mis predicciones →</a>
-  </div>
-
+  <div class="card text-center"><p class="text-gray" style="margin-bottom:14px">¿Listo?</p><a href="predictions.html" class="btn btn-gold">✏️ Hacer mis predicciones →</a></div>
 </div>
-</body>
-</html>
+</body></html>

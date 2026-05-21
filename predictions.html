@@ -1,224 +1,103 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mis Predicciones · Polla Mundial 2026</title>
+<!DOCTYPE html><html lang="es"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Predicciones · Polla Mundial 2026</title>
 <link rel="stylesheet" href="css/style.css">
-</head>
-<body>
-<div class="hero" style="padding:24px">
-  <h1 style="font-size:1.6rem">✏️ Mis Predicciones</h1>
-  <p class="subtitle" id="heroName">Cargando...</p>
+</head><body>
+<div class="hero" style="padding:22px">
+  <h1 style="font-size:1.5rem">✏️ Mis Predicciones</h1>
+  <p class="sub" id="heroName">Cargando...</p>
 </div>
 <nav>
   <a href="index.html">🏠 Inicio</a>
   <a href="predictions.html" class="active">✏️ Predicciones</a>
-  <a href="leaderboard.html">🏆 Clasificación</a>
+  <a href="bracket.html">🔱 Bracket</a>
+  <a href="leaderboard.html">🏆 Tabla</a>
   <a href="rules.html">📋 Reglas</a>
 </nav>
-
 <div class="container">
-  <div id="notLoggedIn" style="display:none">
-    <div class="card text-center">
-      <p class="text-gray">Debes registrarte primero</p>
-      <a href="index.html" class="btn btn-primary mt-16">Ir al inicio →</a>
-    </div>
+  <div id="noAuth" style="display:none">
+    <div class="card text-center"><p class="text-gray">Debes registrarte primero</p><a href="index.html" class="btn btn-primary mt-16">Ir al inicio →</a></div>
   </div>
-
   <div id="mainContent" style="display:none">
-    <div class="alert alert-info">
-      ⚠️ <strong>Fase 1</strong> — Predicciones de grupos. Cierra el <strong>11 Jun antes de las 3 PM ET</strong>. Después habrá penalización de -2 pts por cambio.
-    </div>
-
-    <div class="tabs">
-      <button class="tab-btn active" onclick="showTab('matches')">⚽ Partidos</button>
-      <button class="tab-btn" onclick="showTab('groups')">📊 Clasificados</button>
-      <button class="tab-btn" onclick="showTab('champion')">🏆 Campeón</button>
-    </div>
-
-    <!-- TAB: PARTIDOS -->
-    <div id="tab-matches">
-      <div id="matchesContainer"></div>
-    </div>
-
-    <!-- TAB: CLASIFICADOS POR GRUPO -->
-    <div id="tab-groups" style="display:none">
-      <div class="card mb-0">
-        <h2>📊 ¿Quién clasifica de cada grupo?</h2>
-        <p class="text-gray" style="font-size:0.85rem;margin-bottom:16px">Selecciona el 1° y 2° clasificado de cada grupo. Esto te da puntos extra.</p>
-      </div>
-      <div id="groupsContainer"></div>
-    </div>
-
-    <!-- TAB: CAMPEÓN -->
-    <div id="tab-champion" style="display:none">
-      <div class="card">
-        <h2>🏆 Predicción Final del Torneo</h2>
-        <p class="text-gray" style="font-size:0.85rem;margin-bottom:20px">
-          Acierta el campeón: <strong class="text-gold">+40 pts</strong> · Subcampeón: <strong class="text-gold">+20 pts</strong>
-        </p>
-        <div class="form-group">
-          <label>🥇 Campeón del mundo</label>
-          <select id="champSelect"><option value="">-- Selecciona un equipo --</option></select>
-        </div>
-        <div class="form-group">
-          <label>🥈 Subcampeón</label>
-          <select id="runnerUpSelect"><option value="">-- Selecciona un equipo --</option></select>
-        </div>
-      </div>
-    </div>
-
+    <div class="alert alert-info" id="phaseAlert"></div>
     <div id="saveMsg"></div>
-    <button class="btn btn-gold btn-block" onclick="saveAll()" id="saveBtn">
-      💾 Guardar todas mis predicciones
-    </button>
-    <p class="text-gray text-center mt-8" style="font-size:0.8rem">Puedes guardar varias veces antes del cierre</p>
+    <div id="matchesContainer"></div>
+    <button class="btn btn-gold btn-block" onclick="saveAll()" id="saveBtn">💾 Guardar predicciones</button>
+    <p class="text-gray text-center mt-8" style="font-size:.78rem">Puedes guardar varias veces antes del cierre · El bracket se calcula automáticamente</p>
   </div>
 </div>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/matches.js"></script>
-<script src="js/supabase.js"></script>
+<script src="js/data.js"></script>
+<script src="js/db.js"></script>
 <script>
-let participant = null;
-let existingPreds = { matches: [], groups: [], champion: null };
+let participant=null, existing={}, phase=1;
 
-const allTeams = [...new Set(MATCHES.flatMap(m => [m.home, m.away]))].sort();
-
-window.addEventListener('DOMContentLoaded', async () => {
-  const saved = localStorage.getItem('polla_participant');
-  if (!saved) { document.getElementById('notLoggedIn').style.display='block'; return; }
-  participant = JSON.parse(saved);
-  document.getElementById('heroName').textContent = participant.name;
+window.addEventListener('DOMContentLoaded',async()=>{
+  const saved=localStorage.getItem('polla_p');
+  if(!saved){document.getElementById('noAuth').style.display='block';return;}
+  participant=JSON.parse(saved);
+  document.getElementById('heroName').textContent=participant.name;
   document.getElementById('mainContent').style.display='block';
-
-  try {
-    existingPreds = await getPredictionsForParticipant(participant.id);
-  } catch(e) {}
-
+  const settings=await dbGetSettings();
+  phase=settings.phase||1;
+  const alert=document.getElementById('phaseAlert');
+  if(phase===1){
+    alert.textContent='⏰ Fase 1 — Predice los 70 partidos de grupos. El sistema calcula automáticamente quién clasifica y arma tu bracket eliminatorio completo.';
+  } else {
+    alert.className='alert alert-warn';
+    alert.textContent='🔄 Fase 2 activa — Ya puedes ver tu bracket con los clasificados reales. Tus predicciones de eliminatorias se comparan con los resultados reales del admin.';
+  }
+  try{
+    const preds=await dbGetPredictions(participant.id);
+    preds.forEach(p=>{existing[p.match_id]={home:p.home_score,away:p.away_score};});
+  }catch(e){}
   renderMatches();
-  renderGroups();
-  renderChampion();
 });
 
-function showTab(tab) {
-  ['matches','groups','champion'].forEach(t => {
-    document.getElementById('tab-'+t).style.display = t===tab ? 'block' : 'none';
-  });
-  document.querySelectorAll('.tab-btn').forEach((b,i) => {
-    b.classList.toggle('active', ['matches','groups','champion'][i]===tab);
-  });
-}
-
-function getExistingMatch(matchId) {
-  return existingPreds.matches.find(p => p.match_id === matchId);
-}
-
-function renderMatches() {
-  const container = document.getElementById('matchesContainer');
-  const byGroup = {};
-  MATCHES.forEach(m => { if(!byGroup[m.group]) byGroup[m.group]=[]; byGroup[m.group].push(m); });
-
-  let html = '';
-  Object.entries(byGroup).forEach(([grp, matches]) => {
-    html += `<div class="group-header grp-${grp}"><span class="grp-badge grp-${grp}">${grp}</span> Grupo ${grp}</div>`;
-    matches.forEach(m => {
-      const ex = getExistingMatch(m.id);
-      const h = ex ? ex.home_score : '';
-      const a = ex ? ex.away_score : '';
-      html += `
-      <div class="match-row" title="${m.venue}">
-        <div class="match-team home">${m.home}</div>
-        <div class="match-score"><input type="number" min="0" max="20" id="h${m.id}" value="${h}" placeholder="—"></div>
-        <div class="match-vs">VS</div>
-        <div class="match-score"><input type="number" min="0" max="20" id="a${m.id}" value="${a}" placeholder="—"></div>
-        <div class="match-team away">${m.away}</div>
-      </div>
-      <div class="match-date">${m.date} · ${m.time} ET · ${m.venue}</div>`;
+function renderMatches(){
+  const c=document.getElementById('matchesContainer');
+  const byGroup={};
+  GROUP_MATCHES.forEach(m=>{if(!byGroup[m.group])byGroup[m.group]=[];byGroup[m.group].push(m);});
+  let html='';
+  Object.entries(byGroup).forEach(([grp,matches])=>{
+    html+=`<div class="grp-hdr g${grp}" style="background:var(--bg2);color:var(--white)"><span class="grp g${grp}">${grp}</span>Grupo ${grp}</div>`;
+    matches.forEach(m=>{
+      const ex=existing[m.id]||{};
+      const hv=ex.home!==undefined&&ex.home!==null?ex.home:'';
+      const av=ex.away!==undefined&&ex.away!==null?ex.away:'';
+      html+=`
+      <div class="match-meta">${m.date} · ${m.time} ET · ${m.venue}</div>
+      <div class="match-row">
+        <div class="team-name home">${m.home}</div>
+        <div class="goal-input"><input type="number" min="0" max="20" id="h${m.id}" value="${hv}" placeholder="—"></div>
+        <div class="vs-sep">—</div>
+        <div class="goal-input"><input type="number" min="0" max="20" id="a${m.id}" value="${av}" placeholder="—"></div>
+        <div class="team-name away">${m.away}</div>
+      </div>`;
     });
   });
-  container.innerHTML = html;
+  c.innerHTML=html;
 }
 
-function renderGroups() {
-  const container = document.getElementById('groupsContainer');
-  let html = '';
-  Object.entries(GROUPS).forEach(([grp, teams]) => {
-    const ex = existingPreds.groups.find(g => g.group_key === grp);
-    const first = ex ? ex.first_place : '';
-    const second = ex ? ex.second_place : '';
-    const opts = teams.map(t => `<option value="${t}" ${t===first?'selected':''}>${t}</option>`).join('');
-    const opts2 = teams.map(t => `<option value="${t}" ${t===second?'selected':''}>${t}</option>`).join('');
-    html += `
-    <div class="card" style="margin-bottom:12px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-        <span class="grp-badge grp-${grp}">${grp}</span>
-        <strong>Grupo ${grp}</strong>
-        <span class="text-gray" style="font-size:0.8rem">${teams.join(' · ')}</span>
-      </div>
-      <div class="classify-row">
-        <label>🥇 1° lugar</label>
-        <select id="g${grp}1"><option value="">--</option>${opts}</select>
-      </div>
-      <div class="classify-row">
-        <label>🥈 2° lugar</label>
-        <select id="g${grp}2"><option value="">--</option>${opts2}</select>
-      </div>
-    </div>`;
-  });
-  container.innerHTML = html;
-}
-
-function renderChampion() {
-  const teamOpts = allTeams.map(t => `<option value="${t}">${t}</option>`).join('');
-  document.getElementById('champSelect').innerHTML += teamOpts;
-  document.getElementById('runnerUpSelect').innerHTML += teamOpts;
-  if (existingPreds.champion) {
-    document.getElementById('champSelect').value = existingPreds.champion.champion || '';
-    document.getElementById('runnerUpSelect').value = existingPreds.champion.runner_up || '';
+async function saveAll(){
+  const btn=document.getElementById('saveBtn');
+  btn.disabled=true;btn.textContent='Guardando...';
+  try{
+    const preds=GROUP_MATCHES.map(m=>{
+      const h=document.getElementById('h'+m.id)?.value;
+      const a=document.getElementById('a'+m.id)?.value;
+      if(h===''||a===''||h===null||a===null)return null;
+      const hi=parseInt(h),ai=parseInt(a);
+      if(isNaN(hi)||isNaN(ai))return null;
+      return{match_id:m.id,home_score:hi,away_score:ai,phase:1};
+    }).filter(Boolean);
+    await dbSavePredictions(participant.id,preds);
+    document.getElementById('saveMsg').innerHTML='<div class="alert alert-success">✅ ¡Guardado! Ve al bracket para ver tu simulación completa →</div>';
+    window.scrollTo({top:0,behavior:'smooth'});
+  }catch(e){
+    document.getElementById('saveMsg').innerHTML=`<div class="alert alert-error">❌ ${e.message}</div>`;
   }
-}
-
-async function saveAll() {
-  const btn = document.getElementById('saveBtn');
-  btn.disabled = true; btn.textContent = 'Guardando...';
-
-  try {
-    // Collect match predictions
-    const matchPreds = MATCHES.map(m => ({
-      match_id: m.id,
-      home_score: parseInt(document.getElementById('h'+m.id)?.value ?? '') ,
-      away_score: parseInt(document.getElementById('a'+m.id)?.value ?? ''),
-    })).filter(p => !isNaN(p.home_score) && !isNaN(p.away_score));
-
-    // Collect group predictions
-    const groupPreds = Object.keys(GROUPS).map(grp => ({
-      group_key: grp,
-      first_place: document.getElementById('g'+grp+'1')?.value || null,
-      second_place: document.getElementById('g'+grp+'2')?.value || null,
-    })).filter(g => g.first_place || g.second_place);
-
-    // Champion
-    const champ = document.getElementById('champSelect').value;
-    const runnerUp = document.getElementById('runnerUpSelect').value;
-
-    await Promise.all([
-      matchPreds.length ? savePredictions(participant.id, matchPreds) : Promise.resolve(),
-      groupPreds.length ? saveGroupPredictions(participant.id, groupPreds) : Promise.resolve(),
-      champ ? saveChampionPrediction(participant.id, champ, runnerUp) : Promise.resolve(),
-    ]);
-
-    document.getElementById('saveMsg').innerHTML =
-      '<div class="alert alert-success">✅ ¡Predicciones guardadas! Ya puedes cerrar esta página.</div>';
-    window.scrollTo({top: document.getElementById('saveMsg').offsetTop - 20, behavior:'smooth'});
-  } catch(e) {
-    document.getElementById('saveMsg').innerHTML =
-      `<div class="alert alert-error">❌ Error al guardar: ${e.message}</div>`;
-  }
-
-  btn.disabled = false; btn.textContent = '💾 Guardar todas mis predicciones';
+  btn.disabled=false;btn.textContent='💾 Guardar predicciones';
 }
 </script>
-</body>
-</html>
+</body></html>

@@ -1,148 +1,203 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Clasificación · Polla Mundial 2026</title>
+<!DOCTYPE html><html lang="es"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tabla · Polla Mundial 2026</title>
 <link rel="stylesheet" href="css/style.css">
-</head>
-<body>
-<div class="hero" style="padding:24px">
-  <h1 style="font-size:1.6rem">🏆 Tabla de Clasificación</h1>
-  <p class="subtitle">Actualizada en tiempo real</p>
+</head><body>
+<div class="hero" style="padding:22px">
+  <h1 style="font-size:1.5rem">🏆 Tabla de Clasificación</h1>
+  <p class="sub">Actualizada en tiempo real · Toca un nombre para ver desglose</p>
 </div>
 <nav>
   <a href="index.html">🏠 Inicio</a>
   <a href="predictions.html">✏️ Predicciones</a>
-  <a href="leaderboard.html" class="active">🏆 Clasificación</a>
+  <a href="bracket.html">🔱 Bracket</a>
+  <a href="leaderboard.html" class="active">🏆 Tabla</a>
   <a href="rules.html">📋 Reglas</a>
 </nav>
-
 <div class="container">
 
-  <!-- Prize pool -->
   <div class="card">
     <h2>💰 Premio acumulado</h2>
-    <div class="prize-box">
-      <div class="prize-item">
-        <div class="prize-medal">🥇</div>
-        <div class="prize-label">1er lugar (65%)</div>
-        <div class="prize-amount" id="prize1">—</div>
-      </div>
-      <div class="prize-item">
-        <div class="prize-medal">🥈</div>
-        <div class="prize-label">2do lugar (35%)</div>
-        <div class="prize-amount" id="prize2">—</div>
-      </div>
+    <div class="prize-grid">
+      <div class="prize-item"><div class="prize-medal">🥇</div><div class="prize-lbl">1er lugar (65%)</div><div class="prize-amt" id="p1">—</div></div>
+      <div class="prize-item"><div class="prize-medal">🥈</div><div class="prize-lbl">2do lugar (35%)</div><div class="prize-amt" id="p2">—</div></div>
     </div>
-    <p class="text-gray text-center mt-8" style="font-size:0.8rem" id="prizeNote">—</p>
+    <p class="text-gray text-center mt-8" style="font-size:.78rem" id="pNote">—</p>
   </div>
 
-  <!-- Leaderboard -->
   <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <h2 style="margin:0">📊 Posiciones</h2>
-      <button class="btn btn-sm btn-primary" onclick="loadLeaderboard()">↻ Actualizar</button>
+      <button class="btn btn-sm btn-primary" onclick="load()">↻ Actualizar</button>
     </div>
-
-    <!-- Header -->
-    <div class="lb-row lb-header" style="background:transparent;border-color:transparent">
-      <div>#</div>
-      <div>PARTICIPANTE</div>
-      <div style="text-align:center">PUNTOS</div>
-      <div style="text-align:center">PAGO</div>
+    <div style="display:grid;grid-template-columns:38px 1fr 80px 70px;padding:4px 14px;margin-bottom:4px">
+      <span class="text-gray" style="font-size:.75rem">#</span>
+      <span class="text-gray" style="font-size:.75rem">PARTICIPANTE</span>
+      <span class="text-gray" style="font-size:.75rem;text-align:center">PUNTOS</span>
+      <span class="text-gray" style="font-size:.75rem;text-align:center">PAGO</span>
     </div>
-
-    <div id="lbContainer">
-      <div class="loading"><div class="spinner"></div><p class="mt-8">Cargando...</p></div>
-    </div>
+    <div id="lbContainer"><div class="loading"><div class="spinner"></div></div></div>
   </div>
 
-  <!-- My position highlight -->
-  <div class="card" id="myPositionCard" style="display:none">
+  <div class="card" id="myCard" style="display:none">
     <h2>🎯 Tu posición</h2>
-    <p id="myPositionText" class="text-gray"></p>
+    <p id="myPos" class="text-gray" style="font-size:.9rem"></p>
   </div>
 
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/matches.js"></script>
-<script src="js/supabase.js"></script>
-<script>
-let myParticipant = null;
+<!-- Breakdown modal -->
+<div class="modal-bg" id="modal" onclick="closeModal(event)">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 id="modalTitle">Desglose</h2>
+      <button onclick="document.getElementById('modal').classList.remove('open')" style="background:none;border:none;color:var(--gray);font-size:1.4rem;cursor:pointer">×</button>
+    </div>
+    <div id="modalContent"></div>
+  </div>
+</div>
 
-window.addEventListener('DOMContentLoaded', async () => {
-  const saved = localStorage.getItem('polla_participant');
-  if (saved) myParticipant = JSON.parse(saved);
-  await loadLeaderboard();
-  // Auto-refresh every 60 seconds
-  setInterval(loadLeaderboard, 60000);
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/data.js"></script>
+<script src="js/db.js"></script>
+<script>
+let myP=null, allParticipants=[], allResults=[];
+
+window.addEventListener('DOMContentLoaded',async()=>{
+  const saved=localStorage.getItem('polla_p');
+  if(saved) myP=JSON.parse(saved);
+  await load();
+  setInterval(load,60000);
 });
 
-async function loadLeaderboard() {
-  try {
-    const participants = await getParticipants();
-    renderLeaderboard(participants);
-    updatePrize(participants);
-  } catch(e) {
-    document.getElementById('lbContainer').innerHTML =
-      `<div class="alert alert-error">Error cargando datos: ${e.message}</div>`;
+async function load(){
+  try{
+    [allParticipants,allResults]=await Promise.all([dbGetParticipants(),dbGetResults()]);
+    renderLB();
+    updatePrize();
+  }catch(e){
+    document.getElementById('lbContainer').innerHTML=`<div class="alert alert-error">Error: ${e.message}</div>`;
   }
 }
 
-function renderLeaderboard(participants) {
-  if (!participants || participants.length === 0) {
-    document.getElementById('lbContainer').innerHTML =
-      '<p class="text-gray text-center" style="padding:24px">Aún no hay participantes registrados</p>';
+function renderLB(){
+  if(!allParticipants.length){
+    document.getElementById('lbContainer').innerHTML='<p class="text-gray text-center" style="padding:24px">Aún no hay participantes</p>';
     return;
   }
-
-  const medals = ['🥇','🥈','🥉'];
-  let html = '';
-  participants.forEach((p, i) => {
-    const rank = i + 1;
-    const isMe = myParticipant && p.id === myParticipant.id;
-    const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
-    const medal = medals[i] || rank;
-    html += `
-    <div class="lb-row" style="${isMe ? 'border-color:var(--accent);background:#0a1e2e' : ''}">
-      <div class="lb-rank ${rankClass}">${medal}</div>
-      <div class="lb-name">
-        ${p.name}
-        ${isMe ? '<span style="color:var(--accent);font-size:0.75rem"> ← Tú</span>' : ''}
-      </div>
+  const medals=['🥇','🥈','🥉'];
+  const rankCls=['g','s','b'];
+  let html='';
+  allParticipants.forEach((p,i)=>{
+    const isMe=myP&&p.id===myP.id;
+    const medal=i<3?medals[i]:i+1;
+    const rc=i<3?rankCls[i]:'';
+    html+=`<div class="lb-row" onclick="showBreakdown('${p.id}','${p.name}')" style="${isMe?'border-color:var(--accent);background:#0a1e2e':''}">
+      <div class="lb-rank ${rc}">${medal}</div>
+      <div class="lb-name">${p.name}${isMe?' <span style="color:var(--accent);font-size:.72rem">← tú</span>':''}</div>
       <div class="lb-pts">${p.total_points}</div>
-      <div class="lb-paid ${p.paid ? 'yes' : 'no'}">${p.paid ? '✅ Pagó' : '⏳ Pendiente'}</div>
+      <div class="lb-paid ${p.paid?'yes':'no'}">${p.paid?'✅ Pagó':'⏳ Pendiente'}</div>
     </div>`;
   });
-  document.getElementById('lbContainer').innerHTML = html;
+  document.getElementById('lbContainer').innerHTML=html;
 
-  // Show my position
-  if (myParticipant) {
-    const myIdx = participants.findIndex(p => p.id === myParticipant.id);
-    if (myIdx >= 0) {
-      const card = document.getElementById('myPositionCard');
-      card.style.display = 'block';
-      const total = participants.length;
-      const ahead = total - myIdx - 1;
-      document.getElementById('myPositionText').innerHTML =
-        `Estás en el <strong class="text-gold">puesto ${myIdx+1} de ${total}</strong>. 
-         Tienes <strong class="text-accent">${participants[myIdx].total_points} puntos</strong>.
-         ${myIdx > 0 ? `Te separan <strong>${participants[myIdx-1].total_points - participants[myIdx].total_points} pts</strong> del puesto ${myIdx}.` : '¡Estás liderando! 🔥'}`;
+  if(myP){
+    const idx=allParticipants.findIndex(p=>p.id===myP.id);
+    if(idx>=0){
+      const card=document.getElementById('myCard');
+      card.style.display='block';
+      const gap=idx>0?allParticipants[idx-1].total_points-allParticipants[idx].total_points:0;
+      document.getElementById('myPos').innerHTML=
+        `Estás en el <strong class="text-gold">puesto ${idx+1} de ${allParticipants.length}</strong> con <strong class="text-accent">${allParticipants[idx].total_points} pts</strong>. `+
+        (idx>0?`Te separan <strong>${gap} pts</strong> del puesto ${idx}.`:'¡Vas primero! 🔥');
     }
   }
 }
 
-function updatePrize(participants) {
-  const n = participants ? participants.length : 0;
-  const total = n * 10;
-  document.getElementById('prize1').textContent = '$' + Math.round(total * 0.65);
-  document.getElementById('prize2').textContent = '$' + Math.round(total * 0.35);
-  const paid = participants ? participants.filter(p => p.paid).length : 0;
-  document.getElementById('prizeNote').textContent =
-    `${n} inscritos · ${paid} pagados · Bote confirmado: $${paid * 10} USD`;
+async function showBreakdown(pid,name){
+  document.getElementById('modalTitle').textContent='📊 '+name;
+  document.getElementById('modalContent').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  document.getElementById('modal').classList.add('open');
+
+  try{
+    const preds=await dbGetPredictions(pid);
+    const resultMap={};
+    allResults.forEach(r=>resultMap[r.match_id]={h:r.home_score,a:r.away_score});
+
+    let groupPts=0,elim1Pts=0,elim2Pts=0;
+    let groupRows='',elim1Rows='',elim2Rows='';
+
+    const participant=allParticipants.find(p=>p.id===pid);
+    const bd=participant?.breakdown?JSON.parse(participant.breakdown):{group_matches:[],elim_f1:[],elim_f2:[]};
+
+    // Group matches with real results
+    preds.filter(p=>p.match_id<=70).forEach(p=>{
+      const r=resultMap[p.match_id];
+      const m=GROUP_MATCHES.find(x=>x.id===p.match_id);
+      if(!m) return;
+      const pred=`${p.home_score}-${p.away_score}`;
+      if(!r){groupRows+=`<div class="bd-row"><span>${m.home} vs ${m.away} <span class="text-gray">(pred: ${pred})</span></span><span class="bd-pts zero">⏳</span></div>`;return;}
+      const ph=parseInt(p.home_score),pa=parseInt(p.away_score);
+      const rh=r.h,ra=r.a;
+      let pts=0,lbl='❌';
+      if(ph===rh&&pa===ra){pts=SCORING.group_exact;lbl='✅ Exacto';}
+      else if(Math.sign(ph-pa)===Math.sign(rh-ra)){pts=SCORING.group_winner;lbl='👍 Ganador';}
+      groupPts+=pts;
+      const cls=pts>0?'pos':pts<0?'neg':'zero';
+      groupRows+=`<div class="bd-row"><span>${m.home} vs ${m.away} <span class="text-gray">(pred: ${pred} · real: ${rh}-${ra})</span> ${lbl}</span><span class="bd-pts ${cls}">${pts>0?'+'+pts:pts}</span></div>`;
+    });
+
+    // Elim predictions
+    preds.filter(p=>p.match_id>=71).forEach(p=>{
+      const r=resultMap[p.match_id];
+      if(!r) return;
+      const pred=`${p.home_score}-${p.away_score}`;
+      const ph=parseInt(p.home_score),pa=parseInt(p.away_score);
+      const rh=r.h,ra=r.a;
+      const isF2=p.phase===2;
+      const correct=Math.sign(ph-pa)===Math.sign(rh-ra);
+      const exact=ph===rh&&pa===ra;
+      let pts=0,lbl='❌';
+      if(!isF2){
+        if(exact){pts=SCORING.elim1_exact;lbl='✅ Exacto F1';}
+        else if(correct){pts=SCORING.elim1_winner;lbl='👍 Clasificante F1';}
+        else{pts=SCORING.elim1_miss;lbl='❌ Fallo F1';}
+        elim1Pts+=pts;
+        const cls=pts>0?'pos':pts<0?'neg':'zero';
+        elim1Rows+=`<div class="bd-row"><span>Partido #${p.match_id} <span class="text-gray">(pred: ${pred} · real: ${rh}-${ra})</span> ${lbl}</span><span class="bd-pts ${cls}">${pts>0?'+'+pts:pts}</span></div>`;
+      } else {
+        if(exact){pts=SCORING.elim2_exact;lbl='✅ Exacto F2';}
+        else if(correct){pts=SCORING.elim2_winner;lbl='👍 Clasificante F2';}
+        else{pts=SCORING.elim2_miss;lbl='❌ Fallo F2';}
+        elim2Pts+=pts;
+        const cls=pts>0?'pos':pts<0?'neg':'zero';
+        elim2Rows+=`<div class="bd-row"><span>Partido #${p.match_id} <span class="text-gray">(pred: ${pred} · real: ${rh}-${ra})</span> ${lbl}</span><span class="bd-pts ${cls}">${pts>0?'+'+pts:pts}</span></div>`;
+      }
+    });
+
+    const total=groupPts+elim1Pts+elim2Pts;
+    const html=`
+      <div class="bd-section">
+        <h3>⚽ Partidos de grupo <span class="text-gold">${groupPts>0?'+'+groupPts:groupPts} pts</span></h3>
+        ${groupRows||'<p class="text-gray" style="font-size:.82rem">Sin resultados aún</p>'}
+      </div>
+      ${elim1Rows?`<div class="bd-section"><h3>🔱 Eliminatorias Fase 1 <span class="text-gold">${elim1Pts>0?'+'+elim1Pts:elim1Pts} pts</span></h3>${elim1Rows}</div>`:''}
+      ${elim2Rows?`<div class="bd-section"><h3>🔄 Eliminatorias Fase 2 <span class="text-accent">${elim2Pts>0?'+'+elim2Pts:elim2Pts} pts</span></h3>${elim2Rows}</div>`:''}
+      <div class="bd-total"><span>TOTAL</span><span class="text-gold">${total} pts</span></div>`;
+    document.getElementById('modalContent').innerHTML=html;
+  }catch(e){
+    document.getElementById('modalContent').innerHTML=`<div class="alert alert-error">Error: ${e.message}</div>`;
+  }
+}
+
+function closeModal(e){if(e.target.id==='modal')document.getElementById('modal').classList.remove('open');}
+
+function updatePrize(){
+  const n=allParticipants.length,t=n*10;
+  document.getElementById('p1').textContent='$'+Math.round(t*.65);
+  document.getElementById('p2').textContent='$'+Math.round(t*.35);
+  const paid=allParticipants.filter(p=>p.paid).length;
+  document.getElementById('pNote').textContent=`${n} inscritos · ${paid} pagados · Bote confirmado: $${paid*10} USD`;
 }
 </script>
-</body>
-</html>
+</body></html>
