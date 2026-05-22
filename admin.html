@@ -264,7 +264,10 @@ async function loadParticipants(){
   let html = '';
   parts.forEach(p => {
     html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);gap:8px;flex-wrap:wrap">
-      <div><strong>${p.name}</strong> <span class="text-gold">${p.total_points}pts</span></div>
+      <div>
+        <strong>${p.name}</strong> <span class="text-gold">${p.total_points}pts</span>
+        <span style="margin-left:10px;background:var(--bg);border:1px solid var(--border);padding:2px 8px;border-radius:4px;font-size:.8rem;font-family:monospace;color:var(--accent)">PIN: ${p.pin||'----'}</span>
+      </div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-sm ${p.paid?'btn-primary':'btn-gold'}" onclick="togglePaid('${p.id}',${p.paid})">
           ${p.paid?'✅ Pagado':'⏳ Marcar pago'}
@@ -280,17 +283,18 @@ async function loadParticipants(){
 }
 
 async function createParticipant(){
-  const input = document.getElementById('newParticipantName');
-  const name = input.value.trim();
-  const msg = document.getElementById('createMsg');
-  if (!name || name.length < 2) {
-    msg.innerHTML='<div class="alert alert-error">Escribe un nombre válido</div>'; return;
-  }
+  const nameInput = document.getElementById('newParticipantName');
+  const pinInput  = document.getElementById('newParticipantPin');
+  const name = nameInput.value.trim();
+  const pin  = pinInput.value.trim();
+  const msg  = document.getElementById('createMsg');
+  if (!name || name.length < 2) { msg.innerHTML='<div class="alert alert-error">Escribe un nombre válido</div>'; return; }
+  if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) { msg.innerHTML='<div class="alert alert-error">El PIN debe ser exactamente 4 dígitos numéricos</div>'; return; }
   try {
-    await dbCreateParticipant(name);
-    input.value = '';
-    msg.innerHTML=`<div class="alert alert-success">✅ "${name}" agregado correctamente</div>`;
-    setTimeout(()=>msg.innerHTML='', 3000);
+    await dbCreateParticipantWithPin(name, pin);
+    nameInput.value = ''; pinInput.value = '';
+    msg.innerHTML=`<div class="alert alert-success">✅ "${name}" agregado · PIN: ${pin} · Mándale estos datos por WhatsApp</div>`;
+    setTimeout(()=>msg.innerHTML='', 6000);
     await loadParticipants();
     await loadStats();
   } catch(e) {
