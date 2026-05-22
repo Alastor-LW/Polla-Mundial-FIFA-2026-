@@ -22,28 +22,33 @@
   <div id="adminPanel" style="display:none">
     <div class="alert alert-warn">🔧 Admin activo · Los puntos se recalculan automáticamente al guardar resultados</div>
 
-    <!-- Stats -->
+    <!-- ESTADO -->
     <div class="card">
       <h2>📊 Estado</h2>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;text-align:center">
         <div><div style="font-size:1.6rem;font-weight:700;color:var(--accent)" id="sParts">—</div><div class="text-gray" style="font-size:.78rem">Participantes</div></div>
-        <div><div style="font-size:1.6rem;font-weight:700;color:var(--green)" id="sResults">—</div><div class="text-gray" style="font-size:.78rem">Resultados</div></div>
+        <div><div style="font-size:1.6rem;font-weight:700;color:var(--green)" id="sResults">—</div><div class="text-gray" style="font-size:.78rem">Resultados grupos</div></div>
         <div><div style="font-size:1.6rem;font-weight:700;color:var(--gold)" id="sPaid">—</div><div class="text-gray" style="font-size:.78rem">Pagados</div></div>
       </div>
     </div>
 
-    <!-- Phase control -->
+    <!-- CONTROL DE FASE -->
     <div class="card">
       <h2>🔄 Control de Fase</h2>
       <p class="text-gray" style="font-size:.85rem;margin-bottom:14px">Fase actual: <strong class="text-gold" id="curPhase">—</strong></p>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <button class="btn btn-primary" onclick="setPhase(1)">Activar Fase 1 (grupos)</button>
-        <button class="btn btn-gold" onclick="setPhase(2)">Activar Fase 2 (eliminatorias)</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <button class="btn btn-primary" onclick="setPhase(1,'open')">✅ Abrir Fase 1</button>
+        <button class="btn btn-red" onclick="setPhase(1,'lock')">🔒 Bloquear Fase 1</button>
+        <button class="btn btn-gold" onclick="setPhase(2,'open')">✅ Abrir Fase 2</button>
+        <button class="btn btn-red" onclick="setPhase(2,'lock')">🔒 Bloquear Fase 2</button>
       </div>
-      <div id="phaseMsg" class="mt-8"></div>
+      <div id="phaseMsg"></div>
+      <p class="text-gray" style="font-size:.78rem;margin-top:8px">
+        🔒 Bloquear impide que los participantes hagan más cambios en esa fase
+      </p>
     </div>
 
-    <!-- Result entry -->
+    <!-- INGRESAR RESULTADO -->
     <div class="card">
       <h2>⚽ Ingresar resultado real</h2>
       <div class="form-group">
@@ -59,13 +64,13 @@
       <button class="btn btn-gold btn-block" onclick="saveRes()">💾 Guardar resultado y recalcular puntos</button>
     </div>
 
-    <!-- Results entered -->
+    <!-- RESULTADOS INGRESADOS -->
     <div class="card">
-      <h2>✅ Resultados ingresados</h2>
+      <h2>✅ Resultados ingresados <span class="text-gray" style="font-size:.82rem" id="resultCount"></span></h2>
       <div id="resultsList"><div class="loading"><div class="spinner"></div></div></div>
     </div>
 
-    <!-- Participants -->
+    <!-- PARTICIPANTES -->
     <div class="card">
       <h2>👥 Participantes</h2>
       <div id="partsList"><div class="loading"><div class="spinner"></div></div></div>
@@ -78,7 +83,7 @@
 <script src="js/db.js"></script>
 <script>
 const PASS='mundial2026admin';
-let allResults=[];
+let allResults=[], currentPhase=1, settings={};
 
 function login(){
   if(document.getElementById('adminPass').value===PASS){
@@ -92,161 +97,197 @@ function login(){
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('loginCard').style.display!=='none')login();});
 
 async function initAdmin(){
+  await loadSettings();
   populateMatchSelect();
-  await Promise.all([loadStats(),loadResults(),loadParticipants(),loadPhase()]);
+  await Promise.all([loadStats(),loadResults(),loadParticipants()]);
 }
 
-function populateMatchSelect(){
-  const sel=document.getElementById('matchSel');
-  // Group matches
-  const og=document.createElement('optgroup'); og.label='FASE DE GRUPOS';
-  GROUP_MATCHES.forEach(m=>{
-    const o=document.createElement('option');
-    o.value=m.id; o.textContent=`${m.date} | ${m.home} vs ${m.away}`;
-    og.appendChild(o);
-  });
-  sel.appendChild(og);
-  // Elim matches
-  const elimGroups=[
-    {label:'RONDA DE 32',ids:[[71,'R32-1'],[72,'R32-2'],[73,'R32-3'],[74,'R32-4'],[75,'R32-5'],[76,'R32-6'],[77,'R32-7'],[78,'R32-8'],[79,'R32-9'],[80,'R32-10'],[81,'R32-11'],[82,'R32-12'],[83,'R32-13'],[84,'R32-14'],[85,'R32-15'],[86,'R32-16']]},
-    {label:'OCTAVOS',ids:[[87,'O-1'],[88,'O-2'],[89,'O-3'],[90,'O-4'],[91,'O-5'],[92,'O-6'],[93,'O-7'],[94,'O-8']]},
-    {label:'CUARTOS',ids:[[95,'QF-1'],[96,'QF-2'],[97,'QF-3'],[98,'QF-4']]},
-    {label:'SEMIFINALES',ids:[[99,'SF-1'],[100,'SF-2']]},
-    {label:'FINAL & 3er PUESTO',ids:[[101,'FINAL'],[102,'3er PUESTO']]},
-  ];
-  elimGroups.forEach(eg=>{
-    const og2=document.createElement('optgroup'); og2.label=eg.label;
-    eg.ids.forEach(([id,label])=>{
-      const o=document.createElement('option'); o.value=id; o.textContent=label;
-      og2.appendChild(o);
-    });
-    sel.appendChild(og2);
-  });
-
-  sel.addEventListener('change',()=>{
-    const id=parseInt(sel.value);
-    const m=GROUP_MATCHES.find(x=>x.id===id);
-    if(m){document.getElementById('homeLabel').textContent=m.home;document.getElementById('awayLabel').textContent=m.away;}
-    else{document.getElementById('homeLabel').textContent='Local';document.getElementById('awayLabel').textContent='Visitante';}
-  });
+async function loadSettings(){
+  settings = await dbGetSettings();
+  currentPhase = settings.phase || 1;
+  const locked1 = settings.phase1_locked || false;
+  const locked2 = settings.phase2_locked || false;
+  document.getElementById('curPhase').innerHTML =
+    `Fase ${currentPhase} · F1: ${locked1?'🔒 Bloqueada':'🟢 Abierta'} · F2: ${locked2?'🔒 Bloqueada':'🟢 Abierta'}`;
 }
 
-async function loadPhase(){
-  const s=await dbGetSettings();
-  document.getElementById('curPhase').textContent='Fase '+(s.phase||1);
-}
-
-async function setPhase(p){
-  try{
-    await dbSetPhase(p);
-    document.getElementById('phaseMsg').innerHTML=`<div class="alert alert-success">✅ Fase ${p} activada</div>`;
-    document.getElementById('curPhase').textContent='Fase '+p;
-  }catch(e){
+async function setPhase(phase, action){
+  try {
+    const newSettings = { ...settings };
+    if (action === 'open') {
+      newSettings.phase = phase;
+      if (phase === 1) newSettings.phase1_locked = false;
+      else newSettings.phase2_locked = false;
+    } else {
+      if (phase === 1) newSettings.phase1_locked = true;
+      else newSettings.phase2_locked = true;
+    }
+    await dbSaveSettings(newSettings);
+    settings = newSettings;
+    await loadSettings();
+    // Repopulate match selector based on new phase
+    populateMatchSelect();
+    document.getElementById('phaseMsg').innerHTML =
+      `<div class="alert alert-success">✅ ${action==='open'?'Fase '+phase+' abierta':'Fase '+phase+' bloqueada'}</div>`;
+  } catch(e) {
     document.getElementById('phaseMsg').innerHTML=`<div class="alert alert-error">Error: ${e.message}</div>`;
   }
 }
 
-async function saveRes(){
-  const mid=parseInt(document.getElementById('matchSel').value);
-  const h=parseInt(document.getElementById('homeRes').value);
-  const a=parseInt(document.getElementById('awayRes').value);
-  const msg=document.getElementById('resMsg');
-  if(!mid){msg.innerHTML='<div class="alert alert-error">Selecciona el partido</div>';return;}
-  if(isNaN(h)||isNaN(a)){msg.innerHTML='<div class="alert alert-error">Ingresa ambos marcadores</div>';return;}
-  msg.innerHTML='<div class="alert alert-info">Guardando y recalculando...</div>';
-  try{
-    await dbSaveResult(mid,h,a);
-    // Recalculate all participants
-    allResults=await dbGetResults();
-    const [parts,allPreds]=await Promise.all([dbGetParticipants(),dbGetAllPredictions()]);
-    const resultMap={};
-    allResults.forEach(r=>resultMap[r.match_id]={h:r.home_score,a:r.away_score});
-    // Score each participant
-    for(const p of parts){
-      const myPreds=allPreds.filter(x=>x.participant_id===p.id);
-      let total=0,breakdown={group_matches:[],elim_f1:[],elim_f2:[]};
-      myPreds.forEach(pred=>{
-        const r=resultMap[pred.match_id];
-        if(!r) return;
-        const ph=parseInt(pred.home_score),pa=parseInt(pred.away_score);
-        const rh=r.h,ra=r.a;
-        if(isNaN(ph)||isNaN(pa)) return;
-        let pts=0,lbl='';
-        if(pred.match_id<=70){
-          if(ph===rh&&pa===ra){pts=SCORING.group_exact;lbl='✅ Exacto';}
-          else if(Math.sign(ph-pa)===Math.sign(rh-ra)){pts=SCORING.group_winner;lbl='👍 Ganador';}
-          else lbl='❌';
-          breakdown.group_matches.push({match_id:pred.match_id,pts,lbl});
-        } else {
-          const isF2=pred.phase===2;
-          const correct=Math.sign(ph-pa)===Math.sign(rh-ra);
-          const exact=ph===rh&&pa===ra;
-          if(!isF2){
-            if(exact){pts=SCORING.elim1_exact;lbl='✅ F1 Exacto';}
-            else if(correct){pts=SCORING.elim1_winner;lbl='👍 F1 Clasificante';}
-            else{pts=SCORING.elim1_miss;lbl='❌ F1 Fallo';}
-            // Champion bonus
-            if(pred.match_id===101&&correct) pts+=SCORING.champion_f1;
-            if(pred.match_id===101&&correct) breakdown.elim_f1.push({match_id:'champ_bonus',pts:SCORING.champion_f1,lbl:'🏆 Campeón F1'});
-            breakdown.elim_f1.push({match_id:pred.match_id,pts,lbl});
-          } else {
-            if(exact){pts=SCORING.elim2_exact;lbl='✅ F2 Exacto';}
-            else if(correct){pts=SCORING.elim2_winner;lbl='👍 F2 Clasificante';}
-            else{pts=SCORING.elim2_miss;lbl='❌ F2 Fallo';}
-            if(pred.match_id===101&&correct) pts+=SCORING.champion_f2;
-            breakdown.elim_f2.push({match_id:pred.match_id,pts,lbl});
-          }
-        }
-        total+=pts;
+function populateMatchSelect(){
+  const sel = document.getElementById('matchSel');
+  sel.innerHTML = '<option value="">-- Selecciona --</option>';
+  const phase = settings.phase || 1;
+
+  if (phase === 1) {
+    // Only group matches (IDs 1-72)
+    const byGroup = {};
+    GROUP_MATCHES.forEach(m => {
+      if (!byGroup[m.group]) byGroup[m.group] = [];
+      byGroup[m.group].push(m);
+    });
+    Object.entries(byGroup).forEach(([grp, matches]) => {
+      const og = document.createElement('optgroup');
+      og.label = `GRUPO ${grp}`;
+      matches.forEach(m => {
+        const o = document.createElement('option');
+        o.value = m.id;
+        o.textContent = `${m.date} | ${m.home} vs ${m.away}`;
+        og.appendChild(o);
       });
-      await dbUpdateParticipantPoints(p.id,total,breakdown);
+      sel.appendChild(og);
+    });
+  } else {
+    // Elim matches with real team names from results
+    const elimGroups = [
+      { label:'RONDA DE 32', ids: ELIM_IDS.slice(0,16) },
+      { label:'OCTAVOS',     ids: ELIM_IDS.slice(16,24) },
+      { label:'CUARTOS',     ids: ELIM_IDS.slice(24,28) },
+      { label:'SEMIFINALES', ids: ELIM_IDS.slice(28,30) },
+      { label:'FINAL & 3er', ids: ELIM_IDS.slice(30,32) },
+    ];
+    elimGroups.forEach(eg => {
+      const og = document.createElement('optgroup');
+      og.label = eg.label;
+      eg.ids.forEach(id => {
+        const o = document.createElement('option');
+        o.value = id;
+        o.textContent = `Partido #${id}`;
+        og.appendChild(o);
+      });
+      sel.appendChild(og);
+    });
+  }
+
+  sel.addEventListener('change', () => {
+    const id = parseInt(sel.value);
+    const m = GROUP_MATCHES.find(x => x.id === id);
+    if (m) {
+      document.getElementById('homeLabel').textContent = m.home;
+      document.getElementById('awayLabel').textContent = m.away;
+    } else {
+      document.getElementById('homeLabel').textContent = 'Local';
+      document.getElementById('awayLabel').textContent = 'Visitante';
     }
-    msg.innerHTML='<div class="alert alert-success">✅ Resultado guardado · Puntos recalculados para todos</div>';
-    await Promise.all([loadStats(),loadResults()]);
-  }catch(e){msg.innerHTML=`<div class="alert alert-error">❌ ${e.message}</div>`;}
+  });
+}
+
+async function saveRes(){
+  const mid = parseInt(document.getElementById('matchSel').value);
+  const h = parseInt(document.getElementById('homeRes').value);
+  const a = parseInt(document.getElementById('awayRes').value);
+  const msg = document.getElementById('resMsg');
+  if (!mid) { msg.innerHTML='<div class="alert alert-error">Selecciona el partido</div>'; return; }
+  if (isNaN(h)||isNaN(a)) { msg.innerHTML='<div class="alert alert-error">Ingresa ambos marcadores</div>'; return; }
+  msg.innerHTML = '<div class="alert alert-info">Guardando y recalculando...</div>';
+
+  try {
+    await dbSaveResult(mid, h, a);
+    // Recalculate all participants
+    allResults = await dbGetResults();
+    const resultMap = {};
+    allResults.forEach(r => resultMap[r.match_id] = { h: r.home_score, a: r.away_score });
+
+    const [parts, allPreds] = await Promise.all([dbGetParticipants(), dbGetAllPredictions()]);
+    for (const p of parts) {
+      const myPreds = allPreds.filter(x => x.participant_id === p.id);
+      const bd = calcAllPoints(myPreds, resultMap, null); // null = no classified yet
+      await dbUpdatePoints(p.id, bd.total, bd);
+    }
+
+    msg.innerHTML = '<div class="alert alert-success">✅ Resultado guardado · Puntos recalculados para todos</div>';
+    await Promise.all([loadStats(), loadResults(), loadParticipants()]);
+  } catch(e) {
+    msg.innerHTML = `<div class="alert alert-error">❌ ${e.message}</div>`;
+  }
 }
 
 async function loadStats(){
-  const[parts,results]=await Promise.all([dbGetParticipants(),dbGetResults()]);
-  document.getElementById('sParts').textContent=parts.length;
-  document.getElementById('sResults').textContent=results.length+'/102';
-  document.getElementById('sPaid').textContent=parts.filter(p=>p.paid).length;
+  const [parts, results] = await Promise.all([dbGetParticipants(), dbGetResults()]);
+  const groupResults = results.filter(r => r.match_id <= 72);
+  document.getElementById('sParts').textContent = parts.length;
+  document.getElementById('sResults').textContent = `${groupResults.length}/72`;
+  document.getElementById('sPaid').textContent = parts.filter(p => p.paid).length;
 }
 
 async function loadResults(){
-  allResults=await dbGetResults();
-  const resultMap={};
-  allResults.forEach(r=>resultMap[r.match_id]=r);
-  let html='';
-  GROUP_MATCHES.forEach(m=>{
-    const r=resultMap[m.id];
-    if(!r) return;
-    html+=`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:.85rem">
+  allResults = await dbGetResults();
+  const resultMap = {};
+  allResults.forEach(r => resultMap[r.match_id] = r);
+  const groupResults = allResults.filter(r => r.match_id <= 72);
+
+  document.getElementById('resultCount').textContent = `(${groupResults.length}/72)`;
+
+  let html = '';
+  let num = 1;
+  GROUP_MATCHES.forEach(m => {
+    const r = resultMap[m.id];
+    if (!r) return;
+    html += `<div style="display:grid;grid-template-columns:30px 1fr auto;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:.85rem;align-items:center">
+      <span class="text-gray" style="font-size:.78rem">${num++}</span>
       <span>${m.home} vs ${m.away}</span>
-      <strong class="text-yellow">${r.home_score} — ${r.away_score}</strong>
+      <strong class="text-gold">${r.home_score} — ${r.away_score}</strong>
     </div>`;
   });
-  document.getElementById('resultsList').innerHTML=html||'<p class="text-gray" style="padding:10px">Sin resultados aún</p>';
+  document.getElementById('resultsList').innerHTML = html ||
+    '<p class="text-gray" style="padding:12px">Sin resultados aún</p>';
 }
 
 async function loadParticipants(){
-  const parts=await dbGetParticipants();
-  let html='';
-  parts.forEach(p=>{
-    html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)">
+  const parts = await dbGetParticipants();
+  let html = '';
+  parts.forEach(p => {
+    html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);gap:8px;flex-wrap:wrap">
       <div><strong>${p.name}</strong> <span class="text-gold">${p.total_points}pts</span></div>
-      <button class="btn btn-sm ${p.paid?'btn-primary':'btn-gold'}" onclick="togglePaid('${p.id}',${p.paid})">
-        ${p.paid?'✅ Pagado':'⏳ Marcar pago'}
-      </button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm ${p.paid?'btn-primary':'btn-gold'}" onclick="togglePaid('${p.id}',${p.paid})">
+          ${p.paid?'✅ Pagado':'⏳ Marcar pago'}
+        </button>
+        <button class="btn btn-sm btn-red" onclick="deleteParticipant('${p.id}','${p.name}')">
+          🗑️ Eliminar
+        </button>
+      </div>
     </div>`;
   });
-  document.getElementById('partsList').innerHTML=html||'<p class="text-gray" style="padding:10px">Sin participantes</p>';
+  document.getElementById('partsList').innerHTML = html ||
+    '<p class="text-gray" style="padding:10px">Sin participantes</p>';
 }
 
-async function togglePaid(id,cur){
-  await dbTogglePaid(id,!cur);
+async function togglePaid(id, cur){
+  await dbTogglePaid(id, !cur);
   await loadParticipants();
   await loadStats();
+}
+
+async function deleteParticipant(id, name){
+  if (!confirm(`¿Seguro que quieres eliminar a "${name}"?\n\nEsta acción borrará también todas sus predicciones y no se puede deshacer.`)) return;
+  try {
+    await dbDeleteParticipant(id);
+    await loadParticipants();
+    await loadStats();
+  } catch(e) {
+    alert('Error al eliminar: ' + e.message);
+  }
 }
 </script>
 </body></html>
