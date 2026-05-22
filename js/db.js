@@ -180,3 +180,8 @@ function calcAllPoints(participantPreds, realResults, realClassified) {
                     breakdown.pts_elim_f1 + breakdown.pts_elim_f2 + breakdown.pts_champion;
   return breakdown;
 }
+
+async function dbCreateParticipantWithPin(name, pin){
+  const{data,error}=await sb.from('participants').insert({name,pin,total_points:0,paid:false}).select().single();
+  if(error)throw error; return data;
+}
