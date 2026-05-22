@@ -73,6 +73,12 @@
     <!-- PARTICIPANTES -->
     <div class="card">
       <h2>👥 Participantes</h2>
+      <!-- Crear participante -->
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+        <input type="text" id="newParticipantName" onkeydown="if(event.key==='Enter')createParticipant()" placeholder="Nombre del compa..." maxlength="40" style="flex:1;min-width:180px">
+        <button class="btn btn-primary" onclick="createParticipant()">➕ Agregar</button>
+      </div>
+      <div id="createMsg" style="margin-bottom:8px"></div>
       <div id="partsList"><div class="loading"><div class="spinner"></div></div></div>
     </div>
   </div>
@@ -271,6 +277,29 @@ async function loadParticipants(){
   });
   document.getElementById('partsList').innerHTML = html ||
     '<p class="text-gray" style="padding:10px">Sin participantes</p>';
+}
+
+async function createParticipant(){
+  const input = document.getElementById('newParticipantName');
+  const name = input.value.trim();
+  const msg = document.getElementById('createMsg');
+  if (!name || name.length < 2) {
+    msg.innerHTML='<div class="alert alert-error">Escribe un nombre válido</div>'; return;
+  }
+  try {
+    await dbCreateParticipant(name);
+    input.value = '';
+    msg.innerHTML=`<div class="alert alert-success">✅ "${name}" agregado correctamente</div>`;
+    setTimeout(()=>msg.innerHTML='', 3000);
+    await loadParticipants();
+    await loadStats();
+  } catch(e) {
+    if (e.message.includes('unique') || e.message.includes('duplicate')) {
+      msg.innerHTML='<div class="alert alert-error">❌ Ya existe un participante con ese nombre</div>';
+    } else {
+      msg.innerHTML=`<div class="alert alert-error">❌ Error: ${e.message}</div>`;
+    }
+  }
 }
 
 async function togglePaid(id, cur){
