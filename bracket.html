@@ -8,6 +8,7 @@
   <p class="sub" id="heroName">Cargando...</p>
 </div>
 <nav>
+  <a href="#" onclick="logout()" style="color:var(--gray);font-size:.8rem">🚪 Salir</a>
   <a href="index.html">🏠 Inicio</a>
   <a href="predictions.html">✏️ Predicciones</a>
   <a href="bracket.html" class="active">🔱 Bracket</a>
@@ -304,6 +305,11 @@ async function collectAndSave() {
   drawBracket();
 
   btn.disabled = false; btn.textContent = '💾 Guardar y avanzar bracket';
+}
+
+function logout(){
+  localStorage.removeItem('polla_p');
+  window.location.href='index.html';
 }
 </script>
 </body></html>

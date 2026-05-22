@@ -18,6 +18,7 @@
   <p class="sub">Toca un nombre para ver el desglose completo</p>
 </div>
 <nav>
+  <a href="#" onclick="logout()" style="color:var(--gray);font-size:.8rem">🚪 Salir</a>
   <a href="index.html">🏠 Inicio</a>
   <a href="predictions.html">✏️ Predicciones</a>
   <a href="bracket.html">🔱 Bracket</a>
@@ -188,6 +189,11 @@ function updatePrize(){
   document.getElementById('p2').textContent='$'+Math.round(t*.35);
   const paid=allParticipants.filter(p=>p.paid).length;
   document.getElementById('pNote').textContent=`${n} inscritos · ${paid} pagados · Bote confirmado: $${paid*10} USD`;
+}
+
+function logout(){
+  localStorage.removeItem('polla_p');
+  window.location.href='index.html';
 }
 </script>
 </body></html>

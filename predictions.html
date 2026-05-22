@@ -8,6 +8,7 @@
   <p class="sub" id="heroName">Cargando...</p>
 </div>
 <nav>
+  <a href="#" onclick="logout()" style="color:var(--gray);font-size:.8rem">🚪 Salir</a>
   <a href="index.html">🏠 Inicio</a>
   <a href="predictions.html" class="active">✏️ Predicciones</a>
   <a href="bracket.html">🔱 Bracket</a>
@@ -98,6 +99,11 @@ async function saveAll(){
     document.getElementById('saveMsg').innerHTML=`<div class="alert alert-error">❌ ${e.message}</div>`;
   }
   btn.disabled=false;btn.textContent='💾 Guardar predicciones';
+}
+
+function logout(){
+  localStorage.removeItem('polla_p');
+  window.location.href='index.html';
 }
 </script>
 </body></html>
