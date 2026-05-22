@@ -1,0 +1,172 @@
+<!DOCTYPE html><html lang="es"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Polla Mundial 2026 ⚽</title>
+<link rel="stylesheet" href="css/style.css">
+</head><body>
+<div class="hero">
+  <span class="trophy">⚽</span>
+  <h1>Polla Mundial 2026</h1>
+  <p class="sub">Canadá · México · Estados Unidos</p>
+  <p class="dates">11 de junio – 19 de julio de 2026</p>
+</div>
+<nav>
+  <a href="index.html" class="active">🏠 Inicio</a>
+  <a href="predictions.html">✏️ Predicciones</a>
+  <a href="bracket.html">🔱 Bracket</a>
+  <a href="leaderboard.html">🏆 Tabla</a>
+  <a href="rules.html">📋 Reglas</a>
+</nav>
+<div class="container">
+
+  <!-- LOGIN CARD -->
+  <div class="card" id="loginCard">
+    <h2>👤 Ingresa a tu cuenta</h2>
+    <p class="text-gray" style="font-size:.85rem;margin-bottom:16px">
+      El admin te compartió tu nombre y PIN por WhatsApp
+    </p>
+    <div class="form-group">
+      <label>Tu nombre</label>
+      <input type="text" id="nameInput" placeholder="Ej: Juan Pérez" maxlength="40" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label>PIN (4 dígitos)</label>
+      <input type="password" id="pinInput" placeholder="••••" maxlength="4" inputmode="numeric" autocomplete="off">
+    </div>
+    <div id="regMsg"></div>
+    <button class="btn btn-primary btn-block" onclick="handleLogin()">Entrar →</button>
+    <p class="text-gray text-center mt-8" style="font-size:.78rem">
+      ¿Olvidaste tu PIN? Contacta al admin
+    </p>
+  </div>
+
+  <!-- WELCOME CARD -->
+  <div class="card" id="welcomeCard" style="display:none">
+    <h2>👋 ¡Bienvenido, <span id="wName"></span>!</h2>
+    <p class="text-gray" style="margin-bottom:14px;font-size:.9rem">¿Qué quieres hacer?</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <a href="predictions.html" class="btn btn-primary">✏️ Mis predicciones</a>
+      <a href="bracket.html" class="btn btn-gold">🔱 Ver bracket</a>
+      <a href="leaderboard.html" class="btn btn-green">🏆 Tabla</a>
+    </div>
+    <p class="mt-16 text-gray" style="font-size:.82rem">
+      Mis puntos: <strong class="text-gold" id="myPts">—</strong>
+    </p>
+    <button onclick="logout()" style="margin-top:12px;background:none;border:1px solid var(--border);color:var(--gray);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:.8rem;">
+      🚪 Cambiar de cuenta
+    </button>
+  </div>
+
+  <!-- PRIZE -->
+  <div class="card">
+    <h2>💰 Premio</h2>
+    <p class="text-gray" style="font-size:.88rem;margin-bottom:12px">Inscripción: <strong class="text-gold">$10 USD</strong> por participante</p>
+    <div class="prize-grid">
+      <div class="prize-item"><div class="prize-medal">🥇</div><div class="prize-lbl">1er lugar (65%)</div><div class="prize-amt" id="p1">—</div></div>
+      <div class="prize-item"><div class="prize-medal">🥈</div><div class="prize-lbl">2do lugar (35%)</div><div class="prize-amt" id="p2">—</div></div>
+    </div>
+    <p class="text-gray text-center mt-8" style="font-size:.78rem" id="pNote">Calculando...</p>
+  </div>
+
+  <!-- QUICK SCORING -->
+  <div class="card">
+    <h2>⚡ Puntuación rápida</h2>
+    <div style="display:flex;flex-direction:column;gap:8px;font-size:.88rem;">
+      <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)"><span>Resultado exacto de grupo</span><strong class="text-accent">+3 pts</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)"><span>Solo ganador/empate</span><strong class="text-accent">+1 pt</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)"><span>1° y 2° del grupo en orden exacto</span><strong class="text-green">+10 pts</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)"><span>1° y 2° del grupo correctos pero invertidos</span><strong class="text-green">+6 pts</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)"><span>Acertaste 1 de los 2 clasificados (o el 3°)</span><strong class="text-green">+3 pts</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)"><span>Clasificante eliminatoria Fase 1</span><strong class="text-gold">+5 pts</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)"><span>Resultado exacto eliminatoria F1</span><strong class="text-gold">+8 pts</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)"><span>Campeón Fase 1</span><strong style="color:var(--gold)">+40 pts</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:7px 0"><span>Fallo eliminatoria F1 / F2</span><strong class="text-red">-1 / -2 pts</strong></div>
+    </div>
+    <a href="rules.html" class="btn btn-sm btn-primary mt-16">Ver reglas completas →</a>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/data.js"></script>
+<script src="js/db.js"></script>
+<script>
+window.addEventListener('DOMContentLoaded', async () => {
+  const saved = localStorage.getItem('polla_p');
+  if (saved) {
+    try {
+      const p = JSON.parse(saved);
+      // Verify still exists in DB
+      const fresh = await dbGetParticipant(p.name);
+      if (fresh) {
+        localStorage.setItem('polla_p', JSON.stringify(fresh));
+        showWelcome(fresh);
+      } else {
+        localStorage.removeItem('polla_p');
+      }
+    } catch(e) {
+      localStorage.removeItem('polla_p');
+    }
+  }
+  await loadPrize();
+});
+
+async function handleLogin() {
+  const name = document.getElementById('nameInput').value.trim();
+  const pin  = document.getElementById('pinInput').value.trim();
+  if (name.length < 2) { showMsg('Escribe tu nombre', 'error'); return; }
+  if (pin.length < 4)  { showMsg('Ingresa tu PIN de 4 dígitos', 'error'); return; }
+  showMsg('Verificando...', 'info');
+  try {
+    const p = await dbGetParticipant(name);
+    if (!p) {
+      showMsg('❌ Nombre no encontrado. Verifica o contacta al admin.', 'error');
+      return;
+    }
+    if (p.pin !== pin) {
+      showMsg('❌ PIN incorrecto. Verifica o contacta al admin.', 'error');
+      return;
+    }
+    localStorage.setItem('polla_p', JSON.stringify(p));
+    showMsg('✅ ¡Bienvenido!', 'success');
+    setTimeout(() => showWelcome(p), 500);
+  } catch(e) {
+    showMsg('Error: ' + e.message, 'error');
+  }
+}
+
+function showWelcome(p) {
+  document.getElementById('loginCard').style.display = 'none';
+  document.getElementById('welcomeCard').style.display = 'block';
+  document.getElementById('wName').textContent = p.name;
+  document.getElementById('myPts').textContent = (p.total_points || 0) + ' pts';
+}
+
+function showMsg(msg, type) {
+  document.getElementById('regMsg').innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+}
+
+function logout() {
+  localStorage.removeItem('polla_p');
+  document.getElementById('welcomeCard').style.display = 'none';
+  document.getElementById('loginCard').style.display = 'block';
+  document.getElementById('nameInput').value = '';
+  document.getElementById('pinInput').value = '';
+  document.getElementById('regMsg').innerHTML = '';
+}
+
+async function loadPrize() {
+  try {
+    const ps = await dbGetParticipants();
+    const t = ps.length * 10;
+    document.getElementById('p1').textContent = '$' + Math.round(t * .65);
+    document.getElementById('p2').textContent = '$' + Math.round(t * .35);
+    const paid = ps.filter(p => p.paid).length;
+    document.getElementById('pNote').textContent = `${ps.length} inscritos · ${paid} pagados · Bote: $${t} USD`;
+  } catch(e) {}
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') handleLogin();
+});
+</script>
+</body></html>
