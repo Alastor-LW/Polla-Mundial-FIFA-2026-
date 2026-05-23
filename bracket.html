@@ -24,7 +24,7 @@
     <div class="tabs" id="tabsContainer">
       <button class="tab-btn active" onclick="showTab('standings')">📊 Posiciones</button>
       <button class="tab-btn" onclick="showTab('qualified')">✅ Clasificados</button>
-      <button class="tab-btn" id="tabF1Btn" onclick="showTab('bracketF1')">🔱 Mi Bracket F1</button>
+      <button class="tab-btn" id="tabF1Btn" onclick="showTab('bracketF1')">🔱 Bracket F1</button>
       <button class="tab-btn" id="tabF2Btn" onclick="showTab('bracketF2')" style="display:none">🔄 Bracket F2</button>
     </div>
 
@@ -52,14 +52,21 @@
       </div>
     </div>
 
-    <!-- BRACKET F1 (readonly) -->
+    <!-- BRACKET F1 (editable in phase 1, readonly in phase 2) -->
     <div id="tab-bracketF1" style="display:none">
-      <div class="alert alert-info" style="font-size:.82rem">
-        📋 Tu predicción de la Fase 1 — Solo lectura. Verde = acertaste, Rojo = fallaste.
+      <div class="alert alert-info" id="bracketF1Msg" style="font-size:.82rem">
+        🎯 Fase 1: Ingresa los resultados eliminatorios. Los ganadores avanzan solos.
       </div>
+      <div id="bracketF1SaveMsg"></div>
+      <p class="text-gray" id="bracketF1Hint" style="font-size:.82rem;margin-bottom:12px">
+        💡 Llena los resultados y presiona <strong>💾 Guardar</strong>.
+      </p>
       <div class="bracket-wrap">
         <div class="bracket" id="bracketF1Container" style="align-items:flex-start;min-width:900px"></div>
       </div>
+      <button class="btn btn-gold btn-block mt-16" id="saveBracketF1Btn" onclick="saveBracketF1()">
+        💾 Guardar predicciones Fase 1
+      </button>
     </div>
 
     <!-- BRACKET F2 (editable con clasificados reales) -->
@@ -197,38 +204,94 @@ async function renderQualified() {
   document.getElementById('thirdsContainer').innerHTML = t3 + '</div>';
 }
 
-// ── BRACKET F1 (readonly, shows F1 predictions with comparison to real results) ──
+// ── BRACKET F1 ──────────────────────────────────────────────────────────────
+// Editable in phase 1, readonly with comparison in phase 2
 async function renderBracketF1() {
-  const realResults = await dbGetResults();
-  const realMap = {};
-  realResults.forEach(r => realMap[r.match_id] = { h: r.home_score, a: r.away_score });
+  const locked = settings.phase1_locked || false;
+  const isPhase2 = phase === 2;
+  const msg = document.getElementById('bracketF1Msg');
+  const hint = document.getElementById('bracketF1Hint');
+  const saveBtn = document.getElementById('saveBracketF1Btn');
 
-  const bracket = buildBracket(r32teamsF1, myElimScoresF1);
+  if (isPhase2 || locked) {
+    // READONLY MODE: show F1 predictions vs real results
+    msg.className = 'alert alert-info';
+    msg.textContent = '📋 Tu predicción Fase 1 — Solo lectura. Verde = acertaste, Rojo = fallaste.';
+    hint.style.display = 'none';
+    saveBtn.style.display = 'none';
 
-  function mBoxReadonly(m) {
-    const hv = m.s?.h !== undefined ? m.s.h : '';
-    const av = m.s?.a !== undefined ? m.s.a : '';
-    const real = realMap[m.id];
-    let hClass='', aClass='';
-    if (real && hv !== '') {
-      const predWin = parseInt(hv) >= parseInt(av) ? 'home' : 'away';
-      const realWin = real.h >= real.a ? 'home' : 'away';
-      hClass = predWin === 'home' ? (realWin === 'home' ? 'winner' : '') : '';
-      aClass = predWin === 'away' ? (realWin === 'away' ? 'winner' : '') : '';
+    const realResults = await dbGetResults();
+    const realMap = {};
+    realResults.forEach(r => realMap[r.match_id] = { h: r.home_score, a: r.away_score });
+
+    const bracket = buildBracket(r32teamsF1, myElimScoresF1);
+
+    function mBoxReadonly(m) {
+      const hv = m.s?.h !== undefined && m.s?.h !== '' ? m.s.h : '';
+      const av = m.s?.a !== undefined && m.s?.a !== '' ? m.s.a : '';
+      const real = realMap[m.id];
+      let hStyle='', aStyle='';
+      if (real && hv !== '') {
+        const predWin = parseInt(hv) >= parseInt(av) ? 'home' : 'away';
+        const realWin = real.h >= real.a ? 'home' : 'away';
+        hStyle = predWin==='home' ? (realWin==='home' ? 'background:#0d2e1a' : 'background:#2e0d0d') : '';
+        aStyle = predWin==='away' ? (realWin==='away' ? 'background:#0d2e1a' : 'background:#2e0d0d') : '';
+      }
+      const realScore = real ? `<span style="font-size:.7rem;color:var(--gray);margin-left:4px">(${real.h}-${real.a})</span>` : '';
+      return `<div class="bracket-match">
+        <div class="bracket-team" style="font-size:.8rem;${hStyle}">
+          <span style="flex:1">${m.home||'?'}</span>
+          <span class="bracket-score">${hv}${realScore}</span>
+        </div>
+        <div class="bracket-team" style="font-size:.8rem;${aStyle}">
+          <span style="flex:1">${m.away||'?'}</span>
+          <span class="bracket-score">${av}</span>
+        </div>
+      </div>`;
     }
-    const realScore = real ? `<span style="font-size:.7rem;color:var(--gray);margin-left:4px">(real:${real.h}-${real.a})</span>` : '';
-    return `<div class="bracket-match ${m.winner?'done':''}">
-      <div class="bracket-team ${hClass}" style="font-size:.8rem">
-        <span style="flex:1">${m.home||'?'}</span>
-        <span class="bracket-score">${hv}</span>
-      </div>
-      <div class="bracket-team ${aClass}" style="font-size:.8rem">
-        <span style="flex:1">${m.away||'?'}</span>
-        <span class="bracket-score">${av}${realScore}</span>
+
+    const rounds = [
+      {label:'Ronda de 32<br><small>28 Jun–2 Jul</small>', matches:bracket.r32},
+      {label:'Octavos<br><small>6–9 Jul</small>',          matches:bracket.r16},
+      {label:'Cuartos<br><small>11–12 Jul</small>',        matches:bracket.qf},
+      {label:'Semis<br><small>15–16 Jul</small>',          matches:bracket.sf},
+    ];
+    let html = '';
+    rounds.forEach(r => {
+      html += `<div class="bracket-round"><h3>${r.label}</h3><div class="bracket-matches">`;
+      r.matches.forEach(m => html += mBoxReadonly(m));
+      html += '</div></div>';
+    });
+    const champ = bracket.final.winner;
+    html += `<div class="bracket-round"><h3>Final & 3er<br><small>18–19 Jul</small></h3>
+      <div class="bracket-matches">
+        <div style="font-size:.72rem;color:var(--gold);text-align:center;padding:4px 0">🏆 FINAL</div>
+        ${mBoxReadonly(bracket.final)}
+        <div style="font-size:.72rem;color:var(--gray);text-align:center;padding:8px 0 4px">🥉 3er PUESTO</div>
+        ${mBoxReadonly(bracket.third)}
+        <div style="margin-top:14px;text-align:center;padding:14px;
+          background:${champ?'#1a1000':'var(--bg2)'};border-radius:10px;
+          border:2px solid ${champ?'var(--gold)':'var(--border)'}">
+          <div style="font-size:1.8rem">🏆</div>
+          <div style="color:var(--gold);font-weight:700">${champ||'Pendiente'}</div>
+          <div style="color:var(--gray);font-size:.72rem">Tu campeón F1</div>
+        </div>
       </div>
     </div>`;
-  }
+    document.getElementById('bracketF1Container').innerHTML = html;
 
+  } else {
+    // EDITABLE MODE: phase 1 open
+    msg.className = 'alert alert-warn';
+    msg.textContent = '🎯 Fase 1: Ingresa los resultados eliminatorios. Los ganadores avanzan solos.';
+    hint.style.display = 'block';
+    saveBtn.style.display = 'block';
+    drawBracketF1();
+  }
+}
+
+function drawBracketF1() {
+  const bracket = buildBracket(r32teamsF1, myElimScoresF1);
   const rounds = [
     {label:'Ronda de 32<br><small>28 Jun–2 Jul</small>', matches:bracket.r32},
     {label:'Octavos<br><small>6–9 Jul</small>',          matches:bracket.r16},
@@ -238,16 +301,16 @@ async function renderBracketF1() {
   let html = '';
   rounds.forEach(r => {
     html += `<div class="bracket-round"><h3>${r.label}</h3><div class="bracket-matches">`;
-    r.matches.forEach(m => html += mBoxReadonly(m));
+    r.matches.forEach(m => html += mBoxEditable(m, myElimScoresF1));
     html += '</div></div>';
   });
   const champ = bracket.final.winner;
   html += `<div class="bracket-round"><h3>Final & 3er<br><small>18–19 Jul</small></h3>
     <div class="bracket-matches">
       <div style="font-size:.72rem;color:var(--gold);text-align:center;padding:4px 0">🏆 FINAL</div>
-      ${mBoxReadonly(bracket.final)}
+      ${mBoxEditable(bracket.final, myElimScoresF1)}
       <div style="font-size:.72rem;color:var(--gray);text-align:center;padding:8px 0 4px">🥉 3er PUESTO</div>
-      ${mBoxReadonly(bracket.third)}
+      ${mBoxEditable(bracket.third, myElimScoresF1)}
       <div style="margin-top:14px;text-align:center;padding:14px;
         background:${champ?'#1a1000':'var(--bg2)'};border-radius:10px;
         border:2px solid ${champ?'var(--gold)':'var(--border)'}">
@@ -258,6 +321,44 @@ async function renderBracketF1() {
     </div>
   </div>`;
   document.getElementById('bracketF1Container').innerHTML = html;
+}
+
+async function saveBracketF1() {
+  const btn = document.getElementById('saveBracketF1Btn');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+
+  ELIM_IDS.forEach(id => {
+    const hEl = document.getElementById('f2h' + id) || document.getElementById('bh' + id);
+    const aEl = document.getElementById('f2a' + id) || document.getElementById('ba' + id);
+    // Use f1 prefix
+    const h1 = document.getElementById('f1h' + id);
+    const a1 = document.getElementById('f1a' + id);
+    const hEl2 = h1 || hEl;
+    const aEl2 = a1 || aEl;
+    if (hEl2 && hEl2.value !== '') {
+      const h = parseInt(hEl2.value), a = parseInt(aEl2?.value ?? '0');
+      if (!isNaN(h) && !isNaN(a)) myElimScoresF1[id] = { h, a };
+    }
+  });
+
+  try {
+    const preds = Object.entries(myElimScoresF1).map(([id, s]) => ({
+      match_id: parseInt(id),
+      home_score: parseInt(s.h),
+      away_score: parseInt(s.a),
+      phase: 1
+    })).filter(p => !isNaN(p.home_score));
+
+    await dbSavePredictions(participant.id, preds);
+    document.getElementById('bracketF1SaveMsg').innerHTML =
+      '<div class="alert alert-success">✅ ¡Guardado! Los ganadores avanzan.</div>';
+    setTimeout(() => document.getElementById('bracketF1SaveMsg').innerHTML = '', 4000);
+    drawBracketF1();
+  } catch(e) {
+    document.getElementById('bracketF1SaveMsg').innerHTML =
+      `<div class="alert alert-error">❌ ${e.message}</div>`;
+  }
+  btn.disabled = false; btn.textContent = '💾 Guardar predicciones Fase 1';
 }
 
 // ── BRACKET F2 (editable, uses REAL classified teams) ──
@@ -291,11 +392,11 @@ function mBoxEditable(m, scores) {
   return `<div class="bracket-match ${m.winner?'done':''}">
     <div class="bracket-team ${hW?'winner':''}">
       <span style="flex:1;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.home||'?'}</span>
-      <input class="bracket-input" type="number" min="0" max="20" id="f2h${m.id}" value="${hv}" placeholder="—">
+      <input class="bracket-input" type="number" min="0" max="20" id="${phase===1?'f1h':'f2h'}${m.id}" value="${hv}" placeholder="—">
     </div>
     <div class="bracket-team ${aW?'winner':''}">
       <span style="flex:1;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.away||'?'}</span>
-      <input class="bracket-input" type="number" min="0" max="20" id="f2a${m.id}" value="${av}" placeholder="—">
+      <input class="bracket-input" type="number" min="0" max="20" id="${phase===1?'f1a':'f2a'}${m.id}" value="${av}" placeholder="—">
     </div>
   </div>`;
 }
