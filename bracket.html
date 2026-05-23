@@ -1,0 +1,379 @@
+<!DOCTYPE html><html lang="es"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bracket · Polla Mundial 2026</title>
+<link rel="stylesheet" href="css/style.css">
+</head><body>
+<div class="hero" style="padding:22px">
+  <h1 style="font-size:1.5rem">🔱 Bracket & Clasificación</h1>
+  <p class="sub" id="heroName">Cargando...</p>
+</div>
+<nav>
+  <a href="#" onclick="logout()">🚪 Salir</a>
+  <a href="index.html">🏠 Inicio</a>
+  <a href="predictions.html">✏️ Predicciones</a>
+  <a href="bracket.html" class="active">🔱 Bracket</a>
+  <a href="leaderboard.html">🏆 Tabla</a>
+  <a href="rules.html">📋 Reglas</a>
+</nav>
+<div class="container">
+  <div id="noAuth" style="display:none">
+    <div class="card text-center"><p class="text-gray">Debes registrarte primero</p>
+    <a href="index.html" class="btn btn-primary mt-16">Ir al inicio →</a></div>
+  </div>
+  <div id="mainContent" style="display:none">
+    <div class="tabs" id="tabsContainer">
+      <button class="tab-btn active" onclick="showTab('standings')">📊 Posiciones</button>
+      <button class="tab-btn" onclick="showTab('qualified')">✅ Clasificados</button>
+      <button class="tab-btn" id="tabF1Btn" onclick="showTab('bracketF1')">🔱 Mi Bracket F1</button>
+      <button class="tab-btn" id="tabF2Btn" onclick="showTab('bracketF2')" style="display:none">🔄 Bracket F2</button>
+    </div>
+
+    <!-- POSICIONES -->
+    <div id="tab-standings">
+      <div class="alert alert-info" style="font-size:.82rem">📐 Calculado con tus predicciones de grupos.</div>
+      <div id="standingsContainer"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+
+    <!-- CLASIFICADOS -->
+    <div id="tab-qualified" style="display:none">
+      <div id="qualifiedF1Card" class="card">
+        <h2>🔮 Clasificados según tus predicciones (F1)</h2>
+        <p class="text-gray" style="font-size:.82rem;margin-bottom:14px">Calculado desde tus predicciones de partidos</p>
+        <div id="qualifiedF1Container"></div>
+      </div>
+      <div id="qualifiedRealCard" class="card" style="display:none">
+        <h2>✅ Clasificados REALES (Fase 2)</h2>
+        <p class="text-gray" style="font-size:.82rem;margin-bottom:14px">Calculado desde los resultados reales ingresados por el admin</p>
+        <div id="qualifiedRealContainer"></div>
+      </div>
+      <div class="card">
+        <h2>⚡ 8 Mejores Terceros</h2>
+        <div id="thirdsContainer"></div>
+      </div>
+    </div>
+
+    <!-- BRACKET F1 (readonly) -->
+    <div id="tab-bracketF1" style="display:none">
+      <div class="alert alert-info" style="font-size:.82rem">
+        📋 Tu predicción de la Fase 1 — Solo lectura. Verde = acertaste, Rojo = fallaste.
+      </div>
+      <div class="bracket-wrap">
+        <div class="bracket" id="bracketF1Container" style="align-items:flex-start;min-width:900px"></div>
+      </div>
+    </div>
+
+    <!-- BRACKET F2 (editable con clasificados reales) -->
+    <div id="tab-bracketF2" style="display:none">
+      <div class="alert alert-warn" id="bracketF2Msg" style="font-size:.82rem">
+        🔄 Fase 2: Los equipos son los clasificados REALES. Ingresa tus predicciones eliminatorias.
+      </div>
+      <div id="bracketF2SaveMsg"></div>
+      <p class="text-gray" style="font-size:.82rem;margin-bottom:12px">
+        💡 Llena los resultados y presiona <strong>💾 Guardar</strong>. Los ganadores avanzan solos.
+      </p>
+      <div class="bracket-wrap">
+        <div class="bracket" id="bracketF2Container" style="align-items:flex-start;min-width:900px"></div>
+      </div>
+      <button class="btn btn-gold btn-block mt-16" id="saveBracketBtn" onclick="saveBracketF2()">
+        💾 Guardar predicciones Fase 2
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/data.js"></script>
+<script src="js/db.js"></script>
+<script>
+let participant=null, myScores={}, myElimScoresF1={}, myElimScoresF2={}, 
+    phase=1, settings={}, r32teamsF1=[], r32teamsReal=[];
+
+window.addEventListener('DOMContentLoaded', async () => {
+  const saved = localStorage.getItem('polla_p');
+  if (!saved) { document.getElementById('noAuth').style.display='block'; return; }
+  participant = JSON.parse(saved);
+  document.getElementById('heroName').textContent = participant.name;
+  document.getElementById('mainContent').style.display = 'block';
+
+  const [s, preds] = await Promise.all([dbGetSettings(), dbGetPredictions(participant.id)]);
+  settings = s;
+  phase = s.phase || 1;
+
+  preds.forEach(p => {
+    const h = parseInt(p.home_score), a = parseInt(p.away_score);
+    if (p.match_id <= 72) {
+      myScores[p.match_id] = { home: isNaN(h)?'':h, away: isNaN(a)?'':a };
+    } else if (parseInt(p.phase) === 2) {
+      if (!isNaN(h) && !isNaN(a)) myElimScoresF2[p.match_id] = { h, a };
+    } else {
+      if (!isNaN(h) && !isNaN(a)) myElimScoresF1[p.match_id] = { h, a };
+    }
+  });
+
+  // Show F2 tab if phase 2
+  if (phase === 2) {
+    document.getElementById('tabF2Btn').style.display = 'block';
+  }
+
+  renderStandings();
+  renderQualified();
+  renderBracketF1();
+  if (phase === 2) renderBracketF2();
+});
+
+function showTab(tab) {
+  ['standings','qualified','bracketF1','bracketF2'].forEach(t => {
+    document.getElementById('tab-'+t).style.display = t===tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  const map = {standings:0, qualified:1, bracketF1:2, bracketF2:3};
+  document.querySelectorAll('.tab-btn')[map[tab]]?.classList.add('active');
+}
+
+function renderStandings() {
+  const grouped = calcStandings(myScores);
+  let html = '';
+  Object.entries(grouped).forEach(([grp, teams]) => {
+    html += `<div class="grp-hdr" style="background:var(--bg2)"><span class="grp g${grp}">${grp}</span>Grupo ${grp}</div>
+    <table class="standings-table" style="margin-bottom:16px">
+    <thead><tr><th>EQUIPO</th><th>PJ</th><th>PG</th><th>PE</th><th>PP</th><th>GF</th><th>GC</th><th>DIF</th><th>PTS</th></tr></thead><tbody>`;
+    teams.forEach((t,i) => {
+      const cls = i===0?'q1':i===1?'q2':i===2?'q3':'';
+      const icon = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+      html += `<tr class="${cls}"><td>${icon} ${t.team}</td><td>${t.pj}</td><td>${t.pg}</td><td>${t.pe}</td><td>${t.pp}</td><td>${t.gf}</td><td>${t.gc}</td><td>${t.dif>0?'+'+t.dif:t.dif}</td><td><strong>${t.pts}</strong></td></tr>`;
+    });
+    html += '</tbody></table>';
+  });
+  document.getElementById('standingsContainer').innerHTML = html || '<p class="text-gray">Ingresa predicciones primero.</p>';
+}
+
+async function renderQualified() {
+  // F1: predicted classified
+  const grouped = calcStandings(myScores);
+  const qF1 = getQualified(grouped);
+  r32teamsF1 = buildR32(qF1);
+
+  let html = '<div class="qualified-grid">';
+  Object.keys(GROUPS).forEach(grp => {
+    html += `<div class="qualified-card">
+      <div class="grp-label"><span class="grp g${grp}">${grp}</span> Grupo ${grp}</div>
+      <div class="qualified-team first">🥇 ${qF1.firsts[grp]||'?'}</div>
+      <div class="qualified-team second">🥈 ${qF1.seconds[grp]||'?'}</div>
+    </div>`;
+  });
+  document.getElementById('qualifiedF1Container').innerHTML = html + '</div>';
+
+  // F2: real classified (from actual results)
+  if (phase === 2) {
+    document.getElementById('qualifiedRealCard').style.display = 'block';
+    try {
+      const realQ = await dbGetRealClassified();
+      r32teamsReal = buildR32(realQ);
+      let realHtml = '<div class="qualified-grid">';
+      Object.keys(GROUPS).forEach(grp => {
+        const pred1 = qF1.firsts[grp], real1 = realQ.firsts[grp];
+        const pred2 = qF1.seconds[grp], real2 = realQ.seconds[grp];
+        const c1 = pred1===real1?'text-green':'text-red';
+        const c2 = pred2===real2?'text-green':'text-red';
+        realHtml += `<div class="qualified-card">
+          <div class="grp-label"><span class="grp g${grp}">${grp}</span> Grupo ${grp}</div>
+          <div class="qualified-team first ${c1}">🥇 ${real1||'?'} ${pred1===real1?'✅':'❌ (pred: '+pred1+')'}</div>
+          <div class="qualified-team second ${c2}">🥈 ${real2||'?'} ${pred2===real2?'✅':'❌ (pred: '+pred2+')'}</div>
+        </div>`;
+      });
+      document.getElementById('qualifiedRealContainer').innerHTML = realHtml + '</div>';
+    } catch(e) {}
+  }
+
+  // Thirds
+  const thirds = qF1.thirds;
+  let t3 = '<div class="qualified-grid">';
+  thirds.forEach((t,i) => {
+    t3 += `<div class="qualified-card">
+      <div class="grp-label">#${i+1} mejor 3° · Grupo ${t.group}</div>
+      <div class="qualified-team third">⚡ ${t.team} (${t.pts}pts, ${t.dif>=0?'+'+t.dif:t.dif} dif)</div>
+    </div>`;
+  });
+  document.getElementById('thirdsContainer').innerHTML = t3 + '</div>';
+}
+
+// ── BRACKET F1 (readonly, shows F1 predictions with comparison to real results) ──
+async function renderBracketF1() {
+  const realResults = await dbGetResults();
+  const realMap = {};
+  realResults.forEach(r => realMap[r.match_id] = { h: r.home_score, a: r.away_score });
+
+  const bracket = buildBracket(r32teamsF1, myElimScoresF1);
+
+  function mBoxReadonly(m) {
+    const hv = m.s?.h !== undefined ? m.s.h : '';
+    const av = m.s?.a !== undefined ? m.s.a : '';
+    const real = realMap[m.id];
+    let hClass='', aClass='';
+    if (real && hv !== '') {
+      const predWin = parseInt(hv) >= parseInt(av) ? 'home' : 'away';
+      const realWin = real.h >= real.a ? 'home' : 'away';
+      hClass = predWin === 'home' ? (realWin === 'home' ? 'winner' : '') : '';
+      aClass = predWin === 'away' ? (realWin === 'away' ? 'winner' : '') : '';
+    }
+    const realScore = real ? `<span style="font-size:.7rem;color:var(--gray);margin-left:4px">(real:${real.h}-${real.a})</span>` : '';
+    return `<div class="bracket-match ${m.winner?'done':''}">
+      <div class="bracket-team ${hClass}" style="font-size:.8rem">
+        <span style="flex:1">${m.home||'?'}</span>
+        <span class="bracket-score">${hv}</span>
+      </div>
+      <div class="bracket-team ${aClass}" style="font-size:.8rem">
+        <span style="flex:1">${m.away||'?'}</span>
+        <span class="bracket-score">${av}${realScore}</span>
+      </div>
+    </div>`;
+  }
+
+  const rounds = [
+    {label:'Ronda de 32<br><small>28 Jun–2 Jul</small>', matches:bracket.r32},
+    {label:'Octavos<br><small>6–9 Jul</small>',          matches:bracket.r16},
+    {label:'Cuartos<br><small>11–12 Jul</small>',        matches:bracket.qf},
+    {label:'Semis<br><small>15–16 Jul</small>',          matches:bracket.sf},
+  ];
+  let html = '';
+  rounds.forEach(r => {
+    html += `<div class="bracket-round"><h3>${r.label}</h3><div class="bracket-matches">`;
+    r.matches.forEach(m => html += mBoxReadonly(m));
+    html += '</div></div>';
+  });
+  const champ = bracket.final.winner;
+  html += `<div class="bracket-round"><h3>Final & 3er<br><small>18–19 Jul</small></h3>
+    <div class="bracket-matches">
+      <div style="font-size:.72rem;color:var(--gold);text-align:center;padding:4px 0">🏆 FINAL</div>
+      ${mBoxReadonly(bracket.final)}
+      <div style="font-size:.72rem;color:var(--gray);text-align:center;padding:8px 0 4px">🥉 3er PUESTO</div>
+      ${mBoxReadonly(bracket.third)}
+      <div style="margin-top:14px;text-align:center;padding:14px;
+        background:${champ?'#1a1000':'var(--bg2)'};border-radius:10px;
+        border:2px solid ${champ?'var(--gold)':'var(--border)'}">
+        <div style="font-size:1.8rem">🏆</div>
+        <div style="color:var(--gold);font-weight:700">${champ||'Pendiente'}</div>
+        <div style="color:var(--gray);font-size:.72rem">Tu campeón F1</div>
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('bracketF1Container').innerHTML = html;
+}
+
+// ── BRACKET F2 (editable, uses REAL classified teams) ──
+async function renderBracketF2() {
+  const locked = settings.phase2_locked || false;
+  const msg = document.getElementById('bracketF2Msg');
+  if (locked) {
+    msg.className = 'alert alert-error';
+    msg.textContent = '🔒 Fase 2 bloqueada. Ya no puedes hacer cambios.';
+    document.getElementById('saveBracketBtn').style.display = 'none';
+  }
+
+  try {
+    const realQ = await dbGetRealClassified();
+    r32teamsReal = buildR32(realQ);
+  } catch(e) {
+    document.getElementById('bracketF2Container').innerHTML =
+      '<div class="alert alert-info">⏳ El admin aún no ha ingresado todos los resultados de grupos.</div>';
+    return;
+  }
+
+  drawBracketF2();
+}
+
+function mBoxEditable(m, scores) {
+  const s = scores[m.id] || {};
+  const hv = s.h !== undefined && s.h !== null && s.h !== '' ? s.h : '';
+  const av = s.a !== undefined && s.a !== null && s.a !== '' ? s.a : '';
+  const hW = m.winner && m.winner === m.home && m.home !== '?';
+  const aW = m.winner && m.winner === m.away && m.away !== '?';
+  return `<div class="bracket-match ${m.winner?'done':''}">
+    <div class="bracket-team ${hW?'winner':''}">
+      <span style="flex:1;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.home||'?'}</span>
+      <input class="bracket-input" type="number" min="0" max="20" id="f2h${m.id}" value="${hv}" placeholder="—">
+    </div>
+    <div class="bracket-team ${aW?'winner':''}">
+      <span style="flex:1;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.away||'?'}</span>
+      <input class="bracket-input" type="number" min="0" max="20" id="f2a${m.id}" value="${av}" placeholder="—">
+    </div>
+  </div>`;
+}
+
+function drawBracketF2() {
+  const bracket = buildBracket(r32teamsReal, myElimScoresF2);
+  const rounds = [
+    {label:'Ronda de 32<br><small>28 Jun–2 Jul</small>', matches:bracket.r32},
+    {label:'Octavos<br><small>6–9 Jul</small>',          matches:bracket.r16},
+    {label:'Cuartos<br><small>11–12 Jul</small>',        matches:bracket.qf},
+    {label:'Semis<br><small>15–16 Jul</small>',          matches:bracket.sf},
+  ];
+  let html = '';
+  rounds.forEach(r => {
+    html += `<div class="bracket-round"><h3>${r.label}</h3><div class="bracket-matches">`;
+    r.matches.forEach(m => html += mBoxEditable(m, myElimScoresF2));
+    html += '</div></div>';
+  });
+  const champ = bracket.final.winner;
+  html += `<div class="bracket-round"><h3>Final & 3er<br><small>18–19 Jul</small></h3>
+    <div class="bracket-matches">
+      <div style="font-size:.72rem;color:var(--gold);text-align:center;padding:4px 0">🏆 FINAL</div>
+      ${mBoxEditable(bracket.final, myElimScoresF2)}
+      <div style="font-size:.72rem;color:var(--gray);text-align:center;padding:8px 0 4px">🥉 3er PUESTO</div>
+      ${mBoxEditable(bracket.third, myElimScoresF2)}
+      <div style="margin-top:14px;text-align:center;padding:14px;
+        background:${champ?'#1a1000':'var(--bg2)'};border-radius:10px;
+        border:2px solid ${champ?'var(--gold)':'var(--border)'}">
+        <div style="font-size:1.8rem">🏆</div>
+        <div style="color:var(--gold);font-weight:700">${champ||'Pendiente'}</div>
+        <div style="color:var(--gray);font-size:.72rem">Tu campeón F2</div>
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('bracketF2Container').innerHTML = html;
+}
+
+async function saveBracketF2() {
+  const btn = document.getElementById('saveBracketBtn');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+
+  // Collect F2 inputs
+  ELIM_IDS.forEach(id => {
+    const hEl = document.getElementById('f2h' + id);
+    const aEl = document.getElementById('f2a' + id);
+    if (hEl && hEl.value !== '') {
+      const h = parseInt(hEl.value), a = parseInt(aEl?.value ?? '0');
+      if (!isNaN(h) && !isNaN(a)) myElimScoresF2[id] = { h, a };
+    }
+  });
+
+  try {
+    const preds = Object.entries(myElimScoresF2).map(([id, s]) => ({
+      match_id: parseInt(id),
+      home_score: parseInt(s.h),
+      away_score: parseInt(s.a),
+      phase: 2
+    })).filter(p => !isNaN(p.home_score));
+
+    await dbSavePredictions(participant.id, preds);
+    document.getElementById('bracketF2SaveMsg').innerHTML =
+      '<div class="alert alert-success">✅ ¡Guardado! Los ganadores avanzan.</div>';
+    setTimeout(() => document.getElementById('bracketF2SaveMsg').innerHTML = '', 4000);
+
+    drawBracketF2();
+  } catch(e) {
+    document.getElementById('bracketF2SaveMsg').innerHTML =
+      `<div class="alert alert-error">❌ ${e.message}</div>`;
+  }
+  btn.disabled = false; btn.textContent = '💾 Guardar predicciones Fase 2';
+}
+
+// Also need F1 bracket save
+async function renderBracket() { renderBracketF1(); }
+
+function logout(){
+  localStorage.removeItem('polla_p');
+  window.location.href='index.html';
+}
+</script>
+</body></html>
