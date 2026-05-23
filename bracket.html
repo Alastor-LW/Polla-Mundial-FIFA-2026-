@@ -1,0 +1,310 @@
+<!DOCTYPE html><html lang="es"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bracket · Polla Mundial 2026</title>
+<link rel="stylesheet" href="css/style.css">
+</head><body>
+<div class="hero" style="padding:22px">
+  <h1 style="font-size:1.5rem">🔱 Bracket & Clasificación</h1>
+  <p class="sub" id="heroName">Cargando...</p>
+</div>
+<nav>
+  <a href="#" onclick="logout()" style="color:var(--gray);font-size:.8rem">🚪 Salir</a>
+  <a href="index.html">🏠 Inicio</a>
+  <a href="predictions.html">✏️ Predicciones</a>
+  <a href="bracket.html" class="active">🔱 Bracket</a>
+  <a href="leaderboard.html">🏆 Tabla</a>
+  <a href="rules.html">📋 Reglas</a>
+</nav>
+<div class="container">
+  <div id="noAuth" style="display:none">
+    <div class="card text-center"><p class="text-gray">Debes registrarte primero</p>
+    <a href="index.html" class="btn btn-primary mt-16">Ir al inicio →</a></div>
+  </div>
+  <div id="mainContent" style="display:none">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="showTab('standings')">📊 Posiciones</button>
+      <button class="tab-btn" onclick="showTab('qualified')">✅ Clasificados (32)</button>
+      <button class="tab-btn" onclick="showTab('bracket')">🔱 Bracket</button>
+    </div>
+
+    <div id="tab-standings">
+      <div class="alert alert-info" style="font-size:.82rem">📐 Calculado automáticamente con tus predicciones.</div>
+      <div id="standingsContainer"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+
+    <div id="tab-qualified" style="display:none">
+      <div class="card">
+        <h2>✅ Los 32 clasificados</h2>
+        <p class="text-gray" style="font-size:.82rem;margin-bottom:14px">🥇 Primeros · 🥈 Segundos · ⚡ Mejores terceros</p>
+        <div id="qualifiedContainer"></div>
+      </div>
+      <div class="card"><h2>⚡ 8 Mejores Terceros</h2><div id="thirdsContainer"></div></div>
+    </div>
+
+    <div id="tab-bracket" style="display:none">
+      <div class="alert alert-warn" id="bracketPhaseMsg" style="font-size:.82rem"></div>
+      <div id="bracketSaveMsg"></div>
+      <p class="text-gray" style="font-size:.82rem;margin-bottom:12px">
+        💡 Llena los resultados y presiona <strong>💾 Guardar</strong>. Los ganadores pasan solos a la siguiente ronda.
+      </p>
+      <div class="bracket-wrap">
+        <div class="bracket" id="bracketContainer" style="align-items:flex-start;min-width:900px"></div>
+      </div>
+      <button class="btn btn-gold btn-block mt-16" id="saveBtn" onclick="collectAndSave()">💾 Guardar y avanzar bracket</button>
+      <p class="text-gray text-center mt-8" style="font-size:.78rem">Guarda después de llenar cada ronda</p>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/data.js"></script>
+<script src="js/db.js"></script>
+<script>
+let participant=null, myScores={}, myElimScores={}, phase=1, r32teams=[];
+
+// ELIM_IDS is defined in data.js (IDs 73-104)
+
+window.addEventListener('DOMContentLoaded', async () => {
+  const saved = localStorage.getItem('polla_p');
+  if (!saved) { document.getElementById('noAuth').style.display='block'; return; }
+  participant = JSON.parse(saved);
+  document.getElementById('heroName').textContent = participant.name;
+  document.getElementById('mainContent').style.display = 'block';
+
+  const [settings, preds] = await Promise.all([dbGetSettings(), dbGetPredictions(participant.id)]);
+  phase = settings.phase || 1;
+
+  preds.forEach(p => {
+    const h = parseInt(p.home_score), a = parseInt(p.away_score);
+    if (p.match_id <= 70) {
+      myScores[p.match_id] = { home: isNaN(h)?'':h, away: isNaN(a)?'':a };
+    } else {
+      // Store as integers always
+      if (!isNaN(h) && !isNaN(a)) {
+        myElimScores[p.match_id] = { h, a };
+      }
+    }
+  });
+
+  renderStandings();
+  renderQualified();
+  renderBracket();
+});
+
+function showTab(tab) {
+  ['standings','qualified','bracket'].forEach(t => {
+    document.getElementById('tab-'+t).style.display = t===tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    b.classList.toggle('active', ['standings','qualified','bracket'][i]===tab);
+  });
+}
+
+function renderStandings() {
+  const grouped = calcStandings(myScores);
+  let html = '';
+  Object.entries(grouped).forEach(([grp, teams]) => {
+    html += `<div class="grp-hdr" style="background:var(--bg2)"><span class="grp g${grp}">${grp}</span>Grupo ${grp}</div>
+    <table class="standings-table" style="margin-bottom:16px">
+    <thead><tr><th>EQUIPO</th><th>PJ</th><th>PG</th><th>PE</th><th>PP</th><th>GF</th><th>GC</th><th>DIF</th><th>PTS</th></tr></thead><tbody>`;
+    teams.forEach((t,i) => {
+      const cls = i===0?'q1':i===1?'q2':i===2?'q3':'';
+      const icon = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+      html += `<tr class="${cls}"><td>${icon} ${t.team}</td><td>${t.pj}</td><td>${t.pg}</td><td>${t.pe}</td><td>${t.pp}</td><td>${t.gf}</td><td>${t.gc}</td><td>${t.dif>0?'+'+t.dif:t.dif}</td><td><strong>${t.pts}</strong></td></tr>`;
+    });
+    html += '</tbody></table>';
+  });
+  document.getElementById('standingsContainer').innerHTML = html || '<p class="text-gray">Ingresa predicciones de grupos primero.</p>';
+}
+
+function renderQualified() {
+  const grouped = calcStandings(myScores);
+  const q = getQualified(grouped);
+  r32teams = buildR32(q);
+  let html = '<div class="qualified-grid">';
+  Object.keys(GROUPS).forEach(grp => {
+    html += `<div class="qualified-card">
+      <div class="grp-label"><span class="grp g${grp}">${grp}</span> Grupo ${grp}</div>
+      <div class="qualified-team first">🥇 ${q.firsts[grp]||'?'}</div>
+      <div class="qualified-team second">🥈 ${q.seconds[grp]||'?'}</div>
+    </div>`;
+  });
+  html += '</div>';
+  document.getElementById('qualifiedContainer').innerHTML = html;
+  let t3 = '<div class="qualified-grid">';
+  q.thirds.forEach((t,i) => {
+    t3 += `<div class="qualified-card">
+      <div class="grp-label">#${i+1} mejor 3° · Grupo ${t.group}</div>
+      <div class="qualified-team third">⚡ ${t.team} (${t.pts}pts, ${t.dif>=0?'+'+t.dif:t.dif} dif)</div>
+    </div>`;
+  });
+  document.getElementById('thirdsContainer').innerHTML = t3 + '</div>';
+}
+
+// ── WINNER ENGINE ────────────────────────────────────────────────
+function winner(id, home, away) {
+  const s = myElimScores[id];
+  if (!s || s.h===undefined || s.h===null || s.h==='') return null;
+  const h = parseInt(s.h), a = parseInt(s.a);
+  if (isNaN(h) || isNaN(a)) return null;
+  return h >= a ? home : away;
+}
+
+function buildBracket() {
+  // r32teams already set by renderQualified
+  const r32 = r32teams.map(m => ({
+    id: m.id, home: m.home, away: m.away,
+    winner: winner(m.id, m.home, m.away),
+    s: myElimScores[m.id] || {}
+  }));
+
+  const r16 = [
+    {id:87, home:r32[0].winner||'?', away:r32[1].winner||'?'},
+    {id:88, home:r32[2].winner||'?', away:r32[3].winner||'?'},
+    {id:89, home:r32[4].winner||'?', away:r32[5].winner||'?'},
+    {id:90, home:r32[6].winner||'?', away:r32[7].winner||'?'},
+    {id:91, home:r32[8].winner||'?', away:r32[9].winner||'?'},
+    {id:92, home:r32[10].winner||'?', away:r32[11].winner||'?'},
+    {id:93, home:r32[12].winner||'?', away:r32[13].winner||'?'},
+    {id:94, home:r32[14].winner||'?', away:r32[15].winner||'?'},
+  ].map(m => ({ ...m, winner: winner(m.id, m.home, m.away), s: myElimScores[m.id]||{} }));
+
+  const qf = [
+    {id:95, home:r16[0].winner||'?', away:r16[1].winner||'?'},
+    {id:96, home:r16[2].winner||'?', away:r16[3].winner||'?'},
+    {id:97, home:r16[4].winner||'?', away:r16[5].winner||'?'},
+    {id:98, home:r16[6].winner||'?', away:r16[7].winner||'?'},
+  ].map(m => ({ ...m, winner: winner(m.id, m.home, m.away), s: myElimScores[m.id]||{} }));
+
+  const sf = [
+    {id:99,  home:qf[0].winner||'?', away:qf[1].winner||'?'},
+    {id:100, home:qf[2].winner||'?', away:qf[3].winner||'?'},
+  ].map(m => {
+    const w = winner(m.id, m.home, m.away);
+    return { ...m, winner: w, loser: w?(w===m.home?m.away:m.home):null, s: myElimScores[m.id]||{} };
+  });
+
+  const fh = sf[0].winner||'?', fa = sf[1].winner||'?';
+  const final = { id:101, home:fh, away:fa, winner:winner(101,fh,fa), s:myElimScores[101]||{} };
+  const th = sf[0].loser||'?', ta = sf[1].loser||'?';
+  const third = { id:102, home:th, away:ta, winner:winner(102,th,ta), s:myElimScores[102]||{} };
+
+  return { r32, r16, qf, sf, final, third };
+}
+
+// ── RENDER ───────────────────────────────────────────────────────
+function renderBracket() {
+  const msg = document.getElementById('bracketPhaseMsg');
+  msg.textContent = phase===1
+    ? '🎯 Fase 1: Llena los resultados y guarda. Los ganadores avanzan solos.'
+    : '🔄 Fase 2: Clasificados reales disponibles. Nuevas predicciones valen menos puntos.';
+
+  const grouped = calcStandings(myScores);
+  const q = getQualified(grouped);
+  r32teams = buildR32(q);
+
+  drawBracket();
+}
+
+function mBox(m) {
+  const hv = (m.s && m.s.h !== undefined && m.s.h !== null && m.s.h !== '') ? m.s.h : '';
+  const av = (m.s && m.s.a !== undefined && m.s.a !== null && m.s.a !== '') ? m.s.a : '';
+  const hW = m.winner && m.winner === m.home && m.home !== '?';
+  const aW = m.winner && m.winner === m.away && m.away !== '?';
+  return `<div class="bracket-match ${m.winner?'done':''}">
+    <div class="bracket-team ${hW?'winner':''}">
+      <span style="flex:1;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.home||'?'}</span>
+      <input class="bracket-input" type="number" min="0" max="20" id="bh${m.id}" value="${hv}" placeholder="—">
+    </div>
+    <div class="bracket-team ${aW?'winner':''}">
+      <span style="flex:1;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.away||'?'}</span>
+      <input class="bracket-input" type="number" min="0" max="20" id="ba${m.id}" value="${av}" placeholder="—">
+    </div>
+  </div>`;
+}
+
+function drawBracket() {
+  const b = buildBracket();
+  const rounds = [
+    { label:'Ronda de 32<br><small style="color:var(--gray)">28 Jun–2 Jul</small>', matches:b.r32 },
+    { label:'Octavos<br><small style="color:var(--gray)">6–9 Jul</small>',          matches:b.r16 },
+    { label:'Cuartos<br><small style="color:var(--gray)">11–12 Jul</small>',        matches:b.qf  },
+    { label:'Semis<br><small style="color:var(--gray)">15–16 Jul</small>',          matches:b.sf  },
+  ];
+  let html = '';
+  rounds.forEach(r => {
+    html += `<div class="bracket-round"><h3>${r.label}</h3><div class="bracket-matches">`;
+    r.matches.forEach(m => html += mBox(m));
+    html += '</div></div>';
+  });
+  const champ = b.final.winner;
+  html += `<div class="bracket-round">
+    <h3>Final & 3er<br><small style="color:var(--gray)">18–19 Jul</small></h3>
+    <div class="bracket-matches">
+      <div style="font-size:.72rem;color:var(--gold);text-align:center;padding:4px 0">🏆 FINAL</div>
+      ${mBox(b.final)}
+      <div style="font-size:.72rem;color:var(--gray);text-align:center;padding:8px 0 4px">🥉 3er PUESTO</div>
+      ${mBox(b.third)}
+      <div style="margin-top:14px;text-align:center;padding:16px 12px;
+           background:${champ?'#1a1000':'var(--bg2)'};border-radius:10px;
+           border:2px solid ${champ?'var(--gold)':'var(--border)'}">
+        <div style="font-size:2rem">🏆</div>
+        <div style="color:var(--gold);font-weight:700;font-size:1.1rem">${champ||'Pendiente'}</div>
+        <div style="color:var(--gray);font-size:.72rem;margin-top:2px">Tu campeón predicho</div>
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('bracketContainer').innerHTML = html;
+}
+
+// ── SAVE: Step 1 collect → Step 2 save DB → Step 3 redraw ───────
+async function collectAndSave() {
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+
+  // STEP 1: Read every possible input from the DOM RIGHT NOW
+  // Use fixed list of IDs so we don't depend on bracket structure
+  ELIM_IDS.forEach(id => {
+    const hEl = document.getElementById('bh' + id);
+    const aEl = document.getElementById('ba' + id);
+    if (hEl && hEl.value !== '' && hEl.value !== null) {
+      const h = parseInt(hEl.value);
+      const a = parseInt(aEl?.value ?? '0');
+      if (!isNaN(h) && !isNaN(a)) {
+        myElimScores[id] = { h, a };  // store as integers
+      }
+    }
+  });
+
+  // STEP 2: Save to DB
+  try {
+    const preds = Object.entries(myElimScores)
+      .map(([id, s]) => ({
+        match_id: parseInt(id),
+        home_score: parseInt(s.h),
+        away_score: parseInt(s.a),
+        phase
+      }))
+      .filter(p => !isNaN(p.home_score) && !isNaN(p.away_score));
+
+    await dbSavePredictions(participant.id, preds);
+    document.getElementById('bracketSaveMsg').innerHTML =
+      '<div class="alert alert-success">✅ ¡Guardado! Los ganadores ya aparecen en la siguiente ronda.</div>';
+    setTimeout(() => document.getElementById('bracketSaveMsg').innerHTML = '', 4000);
+  } catch(e) {
+    document.getElementById('bracketSaveMsg').innerHTML =
+      `<div class="alert alert-error">❌ Error al guardar: ${e.message}</div>`;
+  }
+
+  // STEP 3: Redraw — now myElimScores has integers, winners compute correctly
+  drawBracket();
+
+  btn.disabled = false; btn.textContent = '💾 Guardar y avanzar bracket';
+}
+
+function logout(){
+  localStorage.removeItem('polla_p');
+  window.location.href='index.html';
+}
+</script>
+</body></html>
