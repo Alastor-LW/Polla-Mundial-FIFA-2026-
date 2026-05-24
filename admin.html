@@ -142,7 +142,7 @@ async function setPhase(phase, action){
   }
 }
 
-function populateMatchSelect(){
+async function populateMatchSelect(){
   const sel = document.getElementById('matchSel');
   sel.innerHTML = '<option value="">-- Selecciona --</option>';
   const phase = settings.phase || 1;
@@ -166,13 +166,46 @@ function populateMatchSelect(){
       sel.appendChild(og);
     });
   } else {
-    // Elim matches with real team names from results
+    // Build real team names from actual results
+    const realResults = await dbGetResults();
+    const realGroupScores = {};
+    realResults.filter(r => r.match_id <= 72).forEach(r => {
+      realGroupScores[r.match_id] = { home: r.home_score, away: r.away_score };
+    });
+    const realGrouped = calcStandings(realGroupScores);
+    const realQ = getQualified(realGrouped);
+    const r32 = buildR32(realQ);
+
+    // Build bracket structure with team names
+    function getMatchName(id) {
+      // R32
+      const r32m = r32.find(m => m.id === id);
+      if (r32m) return `${r32m.home} vs ${r32m.away}`;
+      // R16: winners of R32 pairs
+      const r16map = {
+        117: [r32[0], r32[1]], 118: [r32[2], r32[3]],
+        119: [r32[4], r32[5]], 120: [r32[6], r32[7]],
+        121: [r32[8], r32[9]], 122: [r32[10], r32[11]],
+        123: [r32[12], r32[13]], 124: [r32[14], r32[15]],
+      };
+      if (r16map[id]) return `G. ${r16map[id][0].id} vs G. ${r16map[id][1].id}`;
+      // QF
+      const qfMap = {125:'G.117 vs G.118', 126:'G.119 vs G.120', 127:'G.121 vs G.122', 128:'G.123 vs G.124'};
+      if (qfMap[id]) return qfMap[id];
+      // SF
+      const sfMap = {129:'G.125 vs G.126', 130:'G.127 vs G.128'};
+      if (sfMap[id]) return sfMap[id];
+      if (id === 131) return 'FINAL';
+      if (id === 132) return '3er PUESTO';
+      return `Partido #${id}`;
+    }
+
     const elimGroups = [
-      { label:'RONDA DE 32', ids: ELIM_IDS.slice(0,16) },
-      { label:'OCTAVOS',     ids: ELIM_IDS.slice(16,24) },
-      { label:'CUARTOS',     ids: ELIM_IDS.slice(24,28) },
-      { label:'SEMIFINALES', ids: ELIM_IDS.slice(28,30) },
-      { label:'FINAL & 3er', ids: ELIM_IDS.slice(30,32) },
+      { label:'RONDA DE 32 (28 Jun–2 Jul)', ids: ELIM_IDS.slice(0,16) },
+      { label:'OCTAVOS DE FINAL (6–9 Jul)', ids: ELIM_IDS.slice(16,24) },
+      { label:'CUARTOS DE FINAL (11–12 Jul)', ids: ELIM_IDS.slice(24,28) },
+      { label:'SEMIFINALES (15–16 Jul)', ids: ELIM_IDS.slice(28,30) },
+      { label:'FINAL & 3er PUESTO', ids: ELIM_IDS.slice(30,32) },
     ];
     elimGroups.forEach(eg => {
       const og = document.createElement('optgroup');
@@ -180,7 +213,7 @@ function populateMatchSelect(){
       eg.ids.forEach(id => {
         const o = document.createElement('option');
         o.value = id;
-        o.textContent = `Partido #${id}`;
+        o.textContent = getMatchName(id);
         og.appendChild(o);
       });
       sel.appendChild(og);
