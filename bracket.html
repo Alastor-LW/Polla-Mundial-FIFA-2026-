@@ -139,18 +139,52 @@ function showTab(tab) {
 
 function renderStandings() {
   const grouped = calcStandings(myScores);
+  const q = getQualified(grouped);
+
+  // Build set of 32 qualified teams
+  const qualified = new Set();
+  Object.keys(GROUPS).forEach(g => {
+    if(q.firsts[g] && q.firsts[g]!=='?') qualified.add(q.firsts[g]);
+    if(q.seconds[g] && q.seconds[g]!=='?') qualified.add(q.seconds[g]);
+  });
+  q.thirds.forEach(t => { if(t.team) qualified.add(t.team); });
+
+  // Check if we have enough predictions to show qualified
+  const totalPreds = Object.keys(myScores).length;
+  const showBadges = totalPreds > 0;
+
   let html = '';
   Object.entries(grouped).forEach(([grp, teams]) => {
     html += `<div class="grp-hdr" style="background:var(--bg2)"><span class="grp g${grp}">${grp}</span>Grupo ${grp}</div>
     <table class="standings-table" style="margin-bottom:16px">
-    <thead><tr><th>EQUIPO</th><th>PJ</th><th>PG</th><th>PE</th><th>PP</th><th>GF</th><th>GC</th><th>DIF</th><th>PTS</th></tr></thead><tbody>`;
+    <thead><tr><th>EQUIPO</th><th>PJ</th><th>PG</th><th>PE</th><th>PP</th><th>GF</th><th>GC</th><th>DIF</th><th>PTS</th><th></th></tr></thead><tbody>`;
     teams.forEach((t,i) => {
-      const cls = i===0?'q1':i===1?'q2':i===2?'q3':'';
+      const isQ = showBadges && qualified.has(t.team);
+      const isFirst = q.firsts[grp] === t.team;
+      const isSecond = q.seconds[grp] === t.team;
+      const isThird = !isFirst && !isSecond && isQ;
       const icon = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
-      html += `<tr class="${cls}"><td>${icon} ${t.team}</td><td>${t.pj}</td><td>${t.pg}</td><td>${t.pe}</td><td>${t.pp}</td><td>${t.gf}</td><td>${t.gc}</td><td>${t.dif>0?'+'+t.dif:t.dif}</td><td><strong>${t.pts}</strong></td></tr>`;
+      const badge = isFirst
+        ? '<span style="background:#c8a000;color:#000;font-size:.65rem;padding:2px 5px;border-radius:4px;font-weight:700;white-space:nowrap">1° ✓</span>'
+        : isSecond
+        ? '<span style="background:#888;color:#fff;font-size:.65rem;padding:2px 5px;border-radius:4px;font-weight:700;white-space:nowrap">2° ✓</span>'
+        : isThird
+        ? '<span style="background:#cd7f32;color:#fff;font-size:.65rem;padding:2px 5px;border-radius:4px;font-weight:700;white-space:nowrap">3° ⚡</span>'
+        : '';
+      const rowStyle = isFirst ? 'background:rgba(200,160,0,.08)' : isSecond ? 'background:rgba(136,136,136,.08)' : isThird ? 'background:rgba(205,127,50,.06)' : '';
+      html += `<tr style="${rowStyle}"><td>${icon} ${t.team}</td><td>${t.pj}</td><td>${t.pg}</td><td>${t.pe}</td><td>${t.pp}</td><td>${t.gf}</td><td>${t.gc}</td><td>${t.dif>0?'+'+t.dif:t.dif}</td><td><strong>${t.pts}</strong></td><td>${badge}</td></tr>`;
     });
     html += '</tbody></table>';
   });
+
+  if(showBadges) {
+    html += `<div class="alert alert-info" style="font-size:.78rem;margin-top:4px">
+      <span style="background:#c8a000;color:#000;padding:1px 5px;border-radius:3px;font-size:.7rem;font-weight:700">1° ✓</span> Clasificado directo &nbsp;
+      <span style="background:#888;color:#fff;padding:1px 5px;border-radius:3px;font-size:.7rem;font-weight:700">2° ✓</span> Clasificado directo &nbsp;
+      <span style="background:#cd7f32;color:#fff;padding:1px 5px;border-radius:3px;font-size:.7rem;font-weight:700">3° ⚡</span> Mejor tercero (según tus predicciones)
+    </div>`;
+  }
+
   document.getElementById('standingsContainer').innerHTML = html || '<p class="text-gray">Ingresa predicciones primero.</p>';
 }
 
