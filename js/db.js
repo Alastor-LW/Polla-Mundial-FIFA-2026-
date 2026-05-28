@@ -132,6 +132,41 @@ function calcAllPoints(participantPreds, realResults, realClassified) {
       breakdown.group_classify.push({ group: grp, pred1, pred2, real1, real2, pts, label });
       breakdown.pts_classify += pts;
     });
+
+    // ── Penalización por clasificados incorrectos al activar F2 ──────────
+    // -2 pts por cada equipo real clasificado que NO estaba en los 32 predichos
+    const pred32 = new Set();
+    Object.keys(GROUPS).forEach(grp => {
+      if (predQ.firsts[grp] && predQ.firsts[grp] !== '?') pred32.add(predQ.firsts[grp]);
+      if (predQ.seconds[grp] && predQ.seconds[grp] !== '?') pred32.add(predQ.seconds[grp]);
+    });
+    predQ.thirds.forEach(t => { if(t.team) pred32.add(t.team); });
+
+    const real32 = new Set();
+    Object.keys(GROUPS).forEach(grp => {
+      if (realClassified.firsts[grp] && realClassified.firsts[grp] !== '?') real32.add(realClassified.firsts[grp]);
+      if (realClassified.seconds[grp] && realClassified.seconds[grp] !== '?') real32.add(realClassified.seconds[grp]);
+    });
+    realClassified.thirds.forEach(t => { if(t.team) real32.add(t.team); });
+
+    let penaltyPts = 0;
+    const penaltyDetails = [];
+    real32.forEach(team => {
+      if (!pred32.has(team)) {
+        penaltyPts -= 2;
+        penaltyDetails.push({ team, pts: -2, label: `❌ ${team} no estaba en tus 32` });
+      }
+    });
+    if (penaltyPts < 0) {
+      breakdown.group_classify.push({
+        group: 'PENALIZACIÓN', pred1: '', pred2: '',
+        real1: `${penaltyDetails.length} equipos inesperados`,
+        real2: '', pts: penaltyPts,
+        label: `⚠️ ${penaltyDetails.length} equipos reales no predichos × -2 pts`,
+        details: penaltyDetails
+      });
+      breakdown.pts_classify += penaltyPts;
+    }
   }
 
   // ── 3. Puntos por eliminatorias ───────────────────────────
