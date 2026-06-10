@@ -31,7 +31,7 @@
 <script src="js/data.js"></script>
 <script src="js/db.js"></script>
 <script>
-let participant=null, existing={}, phase=1;
+let participant=null, existing={}, phase=1, groupsLocked=false;
 
 window.addEventListener('DOMContentLoaded',async()=>{
   const saved=localStorage.getItem('polla_p');
@@ -43,17 +43,21 @@ window.addEventListener('DOMContentLoaded',async()=>{
   phase=settings.phase||1;
   window._settings=settings;
   const alertEl=document.getElementById('phaseAlert');
-  const locked = phase===1 ? (settings.phase1_locked||false) : (settings.phase2_locked||false);
-  if(locked){
-    alertEl.className='alert alert-error';
-    alertEl.textContent='🔒 Fase '+phase+' bloqueada — Las predicciones están cerradas. Ya no puedes hacer cambios.';
+  // Las predicciones de grupos SOLO se editan en Fase 1 abierta.
+  // En Fase 2 los resultados reales ya se conocen: quedan selladas.
+  groupsLocked = phase!==1 || (settings.phase1_locked||false);
+  if(groupsLocked){
     document.getElementById('saveBtn').disabled=true;
     document.getElementById('saveBtn').textContent='🔒 Predicciones cerradas';
-  } else if(phase===1){
-    alertEl.textContent='⏰ Fase 1 — Predice los 72 partidos de grupos. Cierra el 11 Jun antes del primer partido.';
+    if(phase!==1){
+      alertEl.className='alert alert-info';
+      alertEl.textContent='🔒 Fase de grupos cerrada — Tus predicciones de grupos quedaron selladas. Ve al Bracket para predecir las eliminatorias de la Fase 2.';
+    } else {
+      alertEl.className='alert alert-error';
+      alertEl.textContent='🔒 Fase 1 bloqueada — Las predicciones están cerradas. Ya no puedes hacer cambios.';
+    }
   } else {
-    alertEl.className='alert alert-warn';
-    alertEl.textContent='🔄 Fase 2 — Puedes actualizar predicciones de grupos con penalización.';
+    alertEl.textContent='⏰ Fase 1 — Predice los 72 partidos de grupos. Cierra el 11 Jun antes del primer partido.';
   }
   try{
     const preds=await dbGetPredictions(participant.id);
@@ -77,9 +81,9 @@ function renderMatches(){
       <div class="match-meta">${m.date} · ${m.time} ET · ${m.venue}</div>
       <div class="match-row">
         <div class="team-name home">${m.home}</div>
-        <div class="goal-input"><input type="number" min="0" max="20" id="h${m.id}" value="${hv}" placeholder="—"></div>
+        <div class="goal-input"><input type="number" min="0" max="20" id="h${m.id}" value="${hv}" placeholder="—" ${groupsLocked?'disabled':''}></div>
         <div class="vs-sep">—</div>
-        <div class="goal-input"><input type="number" min="0" max="20" id="a${m.id}" value="${av}" placeholder="—"></div>
+        <div class="goal-input"><input type="number" min="0" max="20" id="a${m.id}" value="${av}" placeholder="—" ${groupsLocked?'disabled':''}></div>
         <div class="team-name away">${m.away}</div>
       </div>`;
     });
@@ -88,6 +92,7 @@ function renderMatches(){
 }
 
 async function saveAll(){
+  if(groupsLocked) return;
   const btn=document.getElementById('saveBtn');
   btn.disabled=true;btn.textContent='Guardando...';
   try{
