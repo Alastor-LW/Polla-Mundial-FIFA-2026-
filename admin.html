@@ -115,12 +115,26 @@ async function loadSettings(){
   currentPhase = settings.phase || 1;
   const locked1 = settings.phase1_locked || false;
   const locked2 = settings.phase2_locked || false;
+  const f1Status = currentPhase === 2
+    ? '🔒 Cerrada (Fase 2 activa)'
+    : (locked1 ? '🔒 Bloqueada' : '🟢 Abierta');
+  const f2Status = currentPhase === 1
+    ? '⚪ Inactiva — se activa al terminar grupos'
+    : (locked2 ? '🔒 Bloqueada' : '🟢 Abierta');
   document.getElementById('curPhase').innerHTML =
-    `Fase ${currentPhase} · F1: ${locked1?'🔒 Bloqueada':'🟢 Abierta'} · F2: ${locked2?'🔒 Bloqueada':'🟢 Abierta'}`;
+    `Fase ${currentPhase} · F1: ${f1Status} · F2: ${f2Status}`;
 }
 
 async function setPhase(phase, action){
   try {
+    if (phase === 2 && action === 'open') {
+      const res = await dbGetResults();
+      const groupCount = res.filter(r => r.match_id <= 72).length;
+      if (groupCount < 72 && !confirm(`⚠️ Solo hay ${groupCount}/72 resultados de grupos.\nLa Fase 2 usa los clasificados REALES y todavía no se pueden calcular.\n¿Activarla de todos modos?`)) {
+        document.getElementById('phaseMsg').innerHTML = '<div class="alert alert-info">Activación de Fase 2 cancelada</div>';
+        return;
+      }
+    }
     const newSettings = { ...settings };
     if (action === 'open') {
       newSettings.phase = phase;
