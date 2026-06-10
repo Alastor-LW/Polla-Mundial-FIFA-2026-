@@ -272,7 +272,9 @@ async function renderBracketF1() {
         aStyle = predWin==='away' ? (realWin==='away' ? 'background:#0d2e1a' : 'background:#2e0d0d') : '';
       }
       const realScore = real ? `<span style="font-size:.7rem;color:var(--gray);margin-left:4px">(${real.h}-${real.a})</span>` : '';
+      const slot = m.label ? `<div style="font-size:.62rem;color:var(--gray);text-align:center;padding:3px 0 1px;letter-spacing:.5px">${m.label}</div>` : '';
       return `<div class="bracket-match">
+        ${slot}
         <div class="bracket-team" style="font-size:.8rem;${hStyle}">
           <span style="flex:1">${m.home||'?'}</span>
           <span class="bracket-score">${hv}${realScore}</span>
@@ -418,7 +420,9 @@ function mBoxEditable(m, scores) {
   const av = s.a !== undefined && s.a !== null && s.a !== '' ? s.a : '';
   const hW = m.winner && m.winner === m.home && m.home !== '?';
   const aW = m.winner && m.winner === m.away && m.away !== '?';
+  const slot = m.label ? `<div style="font-size:.62rem;color:var(--gray);text-align:center;padding:3px 0 1px;letter-spacing:.5px">${m.label}</div>` : '';
   return `<div class="bracket-match ${m.winner?'done':''}">
+    ${slot}
     <div class="bracket-team ${hW?'winner':''}">
       <span style="flex:1;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.home||'?'}</span>
       <input class="bracket-input" type="number" min="0" max="20" id="${phase===1?'f1h':'f2h'}${m.id}" value="${hv}" placeholder="—">

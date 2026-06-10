@@ -55,7 +55,7 @@ label{display:block;margin-bottom:5px;color:var(--gray);font-size:.82rem;}
 .bracket-match{background:var(--bg2);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
 .bracket-match.done{border-color:var(--green);}
 .bracket-team{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;font-size:.82rem;gap:6px;}
-.bracket-team:first-child{border-bottom:1px solid var(--border);}
+.bracket-team+.bracket-team{border-top:1px solid var(--border);}
 .bracket-team.winner{background:#0d2e1a;font-weight:700;color:var(--green);}
 .bracket-score{font-weight:700;color:var(--yellow);min-width:20px;text-align:center;}
 .bracket-input{width:36px;padding:3px;text-align:center;font-size:.9rem;font-weight:700;color:var(--yellow);background:#0a1628;border:1px solid #c8a000;border-radius:4px;}

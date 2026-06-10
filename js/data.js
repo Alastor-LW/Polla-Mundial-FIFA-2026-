@@ -105,22 +105,22 @@ function buildR32(q){
   const f=q.firsts, s=q.seconds, t=q.thirds.map(x=>x.team);
   // Orden oficial FIFA 2026
   return [
-    {id:101, home:s.A, away:s.B},           // 2A vs 2B
-    {id:102, home:f.E, away:t[0]||'3°'},    // 1E vs mejor 3° A/B/C/D/F
-    {id:103, home:f.F, away:s.C},           // 1F vs 2C
-    {id:104, home:f.C, away:s.F},           // 1C vs 2F
-    {id:105, home:f.I, away:t[1]||'3°'},    // 1I vs mejor 3° C/D/F/G/H
-    {id:106, home:s.E, away:s.I},           // 2E vs 2I
-    {id:107, home:f.A, away:t[2]||'3°'},    // 1A vs mejor 3° C/E/F/H/I
-    {id:108, home:f.L, away:t[3]||'3°'},    // 1L vs mejor 3° E/H/I/J/K
-    {id:109, home:f.D, away:t[4]||'3°'},    // 1D vs mejor 3° B/E/F/I/J
-    {id:110, home:f.G, away:t[5]||'3°'},    // 1G vs mejor 3° A/E/H/I/J
-    {id:111, home:s.K, away:s.L},           // 2K vs 2L
-    {id:112, home:f.H, away:s.J},           // 1H vs 2J
-    {id:113, home:f.B, away:t[6]||'3°'},    // 1B vs mejor 3° E/F/G/I/J
-    {id:114, home:f.J, away:s.H},           // 1J vs 2H
-    {id:115, home:f.K, away:t[7]||'3°'},    // 1K vs mejor 3° D/E/I/J/L
-    {id:116, home:s.D, away:s.G},           // 2D vs 2G
+    {id:101, home:s.A, away:s.B,        label:'2°A vs 2°B'},
+    {id:102, home:f.E, away:t[0]||'3°', label:'1°E vs 3°'},
+    {id:103, home:f.F, away:s.C,        label:'1°F vs 2°C'},
+    {id:104, home:f.C, away:s.F,        label:'1°C vs 2°F'},
+    {id:105, home:f.I, away:t[1]||'3°', label:'1°I vs 3°'},
+    {id:106, home:s.E, away:s.I,        label:'2°E vs 2°I'},
+    {id:107, home:f.A, away:t[2]||'3°', label:'1°A vs 3°'},
+    {id:108, home:f.L, away:t[3]||'3°', label:'1°L vs 3°'},
+    {id:109, home:f.D, away:t[4]||'3°', label:'1°D vs 3°'},
+    {id:110, home:f.G, away:t[5]||'3°', label:'1°G vs 3°'},
+    {id:111, home:s.K, away:s.L,        label:'2°K vs 2°L'},
+    {id:112, home:f.H, away:s.J,        label:'1°H vs 2°J'},
+    {id:113, home:f.B, away:t[6]||'3°', label:'1°B vs 3°'},
+    {id:114, home:f.J, away:s.H,        label:'1°J vs 2°H'},
+    {id:115, home:f.K, away:t[7]||'3°', label:'1°K vs 3°'},
+    {id:116, home:s.D, away:s.G,        label:'2°D vs 2°G'},
   ];
 }
 
@@ -193,7 +193,7 @@ function winner(id,home,away,scores){
 
 function buildBracket(r32teams,elimScores){
   const r32=r32teams.map(m=>({
-    id:m.id,home:m.home,away:m.away,
+    id:m.id,home:m.home,away:m.away,label:m.label,
     winner:winner(m.id,m.home,m.away,elimScores),
     s:elimScores[m.id]||{}
   }));
