@@ -153,8 +153,17 @@ function calcStandings(scores){
   return grouped;
 }
 
+// Un grupo solo clasifica equipos si sus 6 partidos están predichos/jugados
+// (pj=3 para los 4 equipos). Sin esto, un grupo vacío "clasificaría" a los
+// dos primeros de la lista por puro orden inicial.
+function groupComplete(teams){
+  return teams.every(t=>t&&t.pj===3);
+}
+
 function getBestThirds(grouped){
-  return Object.keys(GROUPS).map(g=>({...grouped[g][2],group:g}))
+  return Object.keys(GROUPS)
+    .filter(g=>groupComplete(grouped[g]))
+    .map(g=>({...grouped[g][2],group:g}))
     .filter(t=>t&&t.team)
     .sort((a,b)=>{
       if(b.pts!==a.pts)return b.pts-a.pts;
@@ -166,8 +175,9 @@ function getBestThirds(grouped){
 function getQualified(grouped){
   const q={firsts:{},seconds:{},thirds:[]};
   Object.keys(GROUPS).forEach(g=>{
-    q.firsts[g]=grouped[g][0]?.team||'?';
-    q.seconds[g]=grouped[g][1]?.team||'?';
+    const ok=groupComplete(grouped[g]);
+    q.firsts[g]=ok?(grouped[g][0]?.team||'?'):'?';
+    q.seconds[g]=ok?(grouped[g][1]?.team||'?'):'?';
   });
   q.thirds=getBestThirds(grouped);
   return q;
