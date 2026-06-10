@@ -100,7 +100,17 @@ async function saveAll(){
       return{match_id:m.id,home_score:hi,away_score:ai,phase:1};
     }).filter(Boolean);
     await dbSavePredictions(participant.id,preds);
-    document.getElementById('saveMsg').innerHTML='<div class="alert alert-success">✅ ¡Guardado! Ve al bracket para ver tu simulación completa →</div>';
+    const total=GROUP_MATCHES.length;
+    if(preds.length<total){
+      const faltanIds=GROUP_MATCHES.filter(m=>{
+        const h=document.getElementById('h'+m.id)?.value, a=document.getElementById('a'+m.id)?.value;
+        return h===''||a===''||h===null||a===null;
+      });
+      const grupos=[...new Set(faltanIds.map(m=>m.group))].join(', ');
+      document.getElementById('saveMsg').innerHTML=`<div class="alert alert-warn">⚠️ Guardado ${preds.length}/${total} partidos. Te faltan ${total-preds.length} (Grupo${grupos.length>1?'s':''} ${grupos}). ¡Complétalos antes del bloqueo!</div>`;
+    }else{
+      document.getElementById('saveMsg').innerHTML=`<div class="alert alert-success">✅ ¡Guardado! ${total}/${total} partidos completos. Ve al bracket para ver tu simulación completa →</div>`;
+    }
     window.scrollTo({top:0,behavior:'smooth'});
   }catch(e){
     document.getElementById('saveMsg').innerHTML=`<div class="alert alert-error">❌ ${e.message}</div>`;

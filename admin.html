@@ -257,12 +257,15 @@ async function saveRes(){
     const [parts, allPreds] = await Promise.all([dbGetParticipants(), dbGetAllPredictions()]);
 
     // Calculate real classified from actual results
+    // Solo cuando están los 72 resultados de grupos — igual que leaderboard.
+    // Con grupos a medias, la clasificación y la penalización -2 no aplican.
+    const groupResults = allResults.filter(r => r.match_id <= 72);
     const realGroupScores = {};
-    allResults.filter(r => r.match_id <= 72).forEach(r => {
+    groupResults.forEach(r => {
       realGroupScores[r.match_id] = { home: r.home_score, away: r.away_score };
     });
     const realGrouped = calcStandings(realGroupScores);
-    const realClassified = getQualified(realGrouped);
+    const realClassified = groupResults.length >= 72 ? getQualified(realGrouped) : null;
 
     for (const p of parts) {
       const myPreds = allPreds.filter(x => x.participant_id === p.id);

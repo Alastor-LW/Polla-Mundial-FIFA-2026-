@@ -2,7 +2,7 @@ const SCORING={
   group_exact:3, group_winner:1,
   group_both_order:10, group_both_swap:6, group_one:3,
   elim1_winner:5, elim1_exact:8, elim1_miss:-1,
-  elim2_winner:3, elim2_exact:5, elim2_miss:-2,
+  elim2_winner:3, elim2_exact:5, elim2_miss:0,
   champion_f1:40, runner_f1:20, champion_f2:20, runner_f2:10
 };
 

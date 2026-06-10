@@ -169,47 +169,85 @@ function calcAllPoints(participantPreds, realResults, realClassified) {
     }
   }
 
-  // ── 3. Puntos por eliminatorias ───────────────────────────
-  const elimPreds = participantPreds.filter(p => p.match_id >= 101);
-  elimPreds.forEach(p => {
-    const r = realResults[p.match_id];
-    if (!r) return;
-    const ph = parseInt(p.home_score), pa = parseInt(p.away_score);
-    const rh = r.h, ra = r.a;
-    if (isNaN(ph) || isNaN(pa)) return;
-    const isF2 = parseInt(p.phase) === 2;
-    const correct = Math.sign(ph - pa) === Math.sign(rh - ra);
-    const exact = ph === rh && pa === ra;
-    let pts = 0, label = '❌ Fallo';
-    if (!isF2) {
-      if (exact) { pts = SCORING.elim1_exact; label = '✅ Exacto F1'; }
-      else if (correct) { pts = SCORING.elim1_winner; label = '👍 Clasificante F1'; }
-      else { pts = SCORING.elim1_miss; label = '❌ Fallo F1'; }
-      // Bonus campeón (partido 103 = Final)
-      if (p.match_id === 131 && correct) {
-        breakdown.champion.push({ pts: SCORING.champion_f1, label: '🏆 Campeón F1' });
-        breakdown.pts_champion += SCORING.champion_f1;
+  // ── 3. Puntos por eliminatorias (comparación por EQUIPOS) ─────────────
+  // El bracket predicho puede tener equipos distintos al real en un mismo
+  // cruce, así que se reconstruyen ambos brackets completos y se compara
+  // QUÉ EQUIPO avanza en cada cruce — no el marcador por posición.
+  // Requiere realClassified (los resultados eliminatorios reales solo
+  // existen después de que terminan los grupos).
+  if (realClassified) {
+    const elimScoresF1 = {}, elimScoresF2 = {}, realElimScores = {};
+    participantPreds.filter(p => p.match_id >= 101).forEach(p => {
+      const h = parseInt(p.home_score), a = parseInt(p.away_score);
+      if (isNaN(h) || isNaN(a)) return;
+      if (parseInt(p.phase) === 2) elimScoresF2[p.match_id] = { h, a };
+      else elimScoresF1[p.match_id] = { h, a };
+    });
+    Object.keys(realResults).forEach(id => {
+      if (parseInt(id) >= 101) realElimScores[id] = realResults[id];
+    });
+
+    // Bracket real: clasificados reales + resultados reales
+    const realBracket = buildBracket(buildR32(realClassified), realElimScores);
+    // Bracket F1 del participante: SUS clasificados predichos + sus marcadores F1
+    const predScoresG = {};
+    participantPreds.filter(p => p.match_id <= 72).forEach(p => {
+      predScoresG[p.match_id] = { home: p.home_score, away: p.away_score };
+    });
+    const predQF1 = getQualified(calcStandings(predScoresG));
+    const predBracketF1 = buildBracket(buildR32(predQF1), elimScoresF1);
+    // Bracket F2 del participante: clasificados REALES + sus marcadores F2
+    const predBracketF2 = buildBracket(buildR32(realClassified), elimScoresF2);
+
+    const flat = b => [...b.r32, ...b.r16, ...b.qf, ...b.sf, b.final, b.third];
+    const realMap = {};
+    flat(realBracket).forEach(m => realMap[m.id] = m);
+    const roundName = id => id <= 116 ? 'R32' : id <= 124 ? 'Octavos' : id <= 128 ? 'Cuartos' : id <= 130 ? 'Semis' : id === 131 ? 'Final' : '3er puesto';
+
+    const scoreElim = (predBracket, isF2) => {
+      flat(predBracket).forEach(pm => {
+        if (!pm.winner || pm.winner === '?' || pm.home === '?' || pm.away === '?') return; // sin predicción válida
+        const rm = realMap[pm.id];
+        if (!rm || !rm.winner || rm.winner === '?') return; // sin resultado real aún
+        const predLoser = pm.winner === pm.home ? pm.away : pm.home;
+        const realLoser = rm.winner === rm.home ? rm.away : rm.home;
+        // Marcador alineado al ganador para que "exacto" no dependa del lado
+        const ps = pm.winner === pm.home ? [pm.s.h, pm.s.a] : [pm.s.a, pm.s.h];
+        const rs = rm.winner === rm.home ? [rm.s.h, rm.s.a] : [rm.s.a, rm.s.h];
+        const sameWinner = pm.winner === rm.winner;
+        const exact = sameWinner && predLoser === realLoser && ps[0] === rs[0] && ps[1] === rs[1];
+        let pts, label;
+        if (exact)           { pts = isF2 ? SCORING.elim2_exact  : SCORING.elim1_exact;  label = '✅ Exacto'; }
+        else if (sameWinner) { pts = isF2 ? SCORING.elim2_winner : SCORING.elim1_winner; label = '👍 Clasificante'; }
+        else                 { pts = isF2 ? SCORING.elim2_miss   : SCORING.elim1_miss;   label = '❌ Fallo'; }
+        const row = {
+          match_id: pm.id,
+          pred: `${pm.home} ${pm.s.h}-${pm.s.a} ${pm.away}`,
+          real: `${rm.home} ${rm.s.h}-${rm.s.a} ${rm.away}`,
+          pts, label: `${label} · ${roundName(pm.id)}`
+        };
+        if (isF2) { breakdown.elim_f2.push(row); breakdown.pts_elim_f2 += pts; }
+        else      { breakdown.elim_f1.push(row); breakdown.pts_elim_f1 += pts; }
+      });
+
+      // Bonos campeón / subcampeón (por nombre de equipo)
+      const predChamp = predBracket.final.winner, realChamp = realBracket.final.winner;
+      if (predChamp && predChamp !== '?' && realChamp && realChamp !== '?') {
+        const realRunner = realChamp === realBracket.final.home ? realBracket.final.away : realBracket.final.home;
+        if (predChamp === realChamp) {
+          const b = isF2 ? SCORING.champion_f2 : SCORING.champion_f1;
+          breakdown.champion.push({ pts: b, label: `🏆 Campeón ${isF2 ? 'F2' : 'F1'}: ${predChamp}` });
+          breakdown.pts_champion += b;
+        } else if (predChamp === realRunner) {
+          const b = isF2 ? SCORING.runner_f2 : SCORING.runner_f1;
+          breakdown.champion.push({ pts: b, label: `🥈 Subcampeón ${isF2 ? 'F2' : 'F1'}: ${predChamp} llegó a la final` });
+          breakdown.pts_champion += b;
+        }
       }
-      if (p.match_id === 131 && !correct) {
-        // Subcampeón: el perdedor fue el predicho ganador
-        const predWinner = ph >= pa ? 'home' : 'away';
-        // Check if predicted winner matches real runner-up (real loser)
-        // This is handled at match level — simplified for now
-      }
-      breakdown.elim_f1.push({ match_id: p.match_id, pred: `${ph}-${pa}`, real: `${rh}-${ra}`, pts, label });
-      breakdown.pts_elim_f1 += pts;
-    } else {
-      if (exact) { pts = SCORING.elim2_exact; label = '✅ Exacto F2'; }
-      else if (correct) { pts = SCORING.elim2_winner; label = '👍 Clasificante F2'; }
-      else { pts = SCORING.elim2_miss; label = '❌ Fallo F2'; }
-      if (p.match_id === 131 && correct) {
-        breakdown.champion.push({ pts: SCORING.champion_f2, label: '🏆 Campeón F2' });
-        breakdown.pts_champion += SCORING.champion_f2;
-      }
-      breakdown.elim_f2.push({ match_id: p.match_id, pred: `${ph}-${pa}`, real: `${rh}-${ra}`, pts, label });
-      breakdown.pts_elim_f2 += pts;
-    }
-  });
+    };
+    scoreElim(predBracketF1, false);
+    scoreElim(predBracketF2, true);
+  }
 
   breakdown.total = breakdown.pts_groups + breakdown.pts_classify +
                     breakdown.pts_elim_f1 + breakdown.pts_elim_f2 + breakdown.pts_champion;

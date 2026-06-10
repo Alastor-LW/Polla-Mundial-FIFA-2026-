@@ -362,15 +362,10 @@ async function saveBracketF1() {
   btn.disabled = true; btn.textContent = 'Guardando...';
 
   ELIM_IDS.forEach(id => {
-    const hEl = document.getElementById('f2h' + id) || document.getElementById('bh' + id);
-    const aEl = document.getElementById('f2a' + id) || document.getElementById('ba' + id);
-    // Use f1 prefix
-    const h1 = document.getElementById('f1h' + id);
-    const a1 = document.getElementById('f1a' + id);
-    const hEl2 = h1 || hEl;
-    const aEl2 = a1 || aEl;
-    if (hEl2 && hEl2.value !== '') {
-      const h = parseInt(hEl2.value), a = parseInt(aEl2?.value ?? '0');
+    const hEl = document.getElementById('f1h' + id);
+    const aEl = document.getElementById('f1a' + id);
+    if (hEl && hEl.value !== '') {
+      const h = parseInt(hEl.value), a = parseInt(aEl?.value ?? '0');
       if (!isNaN(h) && !isNaN(a)) myElimScoresF1[id] = { h, a };
     }
   });
