@@ -1,0 +1,182 @@
+═══════════════════════════════════════════════════════════════════
+        POLLA MUNDIAL FIFA 2026 — GUÍA COMPLETA DE INSTALACIÓN
+               Y ADAPTACIÓN PARA FUTUROS MUNDIALES
+═══════════════════════════════════════════════════════════════════
+
+Creado por: Alastor-LW
+Tecnologías: HTML/CSS/JS + GitHub Pages + Supabase
+Repositorio: https://github.com/Alastor-LW/Polla-Mundial-FIFA-2026-
+App en vivo: https://alastor-lw.github.io/Polla-Mundial-FIFA-2026-
+
+───────────────────────────────────────────────────────────────────
+PARTE 1 — ESTRUCTURA DE ARCHIVOS
+───────────────────────────────────────────────────────────────────
+
+/
+├── index.html          → Pantalla de login (nombre + PIN)
+├── admin.html          → Panel administrador
+├── bracket.html        → Bracket eliminatorio + posiciones de grupos
+├── predictions.html    → Formulario de 72 predicciones de grupos
+├── leaderboard.html    → Tabla de clasificación con puntos
+├── rules.html          → Reglas completas de la polla
+├── css/
+│   └── style.css       → Estilos de toda la app
+└── js/
+    ├── data.js         → Equipos, partidos, bracket FIFA, motor de standings
+    └── db.js           → Conexión Supabase, funciones DB, motor de puntuación
+
+───────────────────────────────────────────────────────────────────
+PARTE 2 — INSTALACIÓN DESDE CERO
+───────────────────────────────────────────────────────────────────
+
+PASO 1: CREAR REPOSITORIO EN GITHUB
+1. Ir a github.com → New repository
+2. Nombre: Polla-Mundial-FIFA-XXXX (ej: Polla-Mundial-FIFA-2030)
+3. Visibility: Public
+4. Crear repositorio vacío
+5. Cambiar idioma de GitHub a INGLÉS antes de subir archivos:
+   github.com → foto de perfil → Settings → Language → English
+
+PASO 2: SUBIR ARCHIVOS
+1. En el repositorio, clic "Add file" → "Upload files"
+2. Subir TODOS los archivos manteniendo la estructura de carpetas:
+   - Los .html van en la raíz
+   - css/style.css va dentro de carpeta "css"
+   - js/data.js y js/db.js van dentro de carpeta "js"
+3. Confirmar cambios ("Commit changes")
+
+PASO 3: ACTIVAR GITHUB PAGES
+1. En el repositorio → Settings → Pages
+2. Source: "Deploy from a branch"
+3. Branch: main → / (root)
+4. Save
+5. Esperar 2-3 minutos → la app estará en:
+   https://TU-USUARIO.github.io/NOMBRE-REPOSITORIO/
+
+PASO 4: CREAR BASE DE DATOS EN SUPABASE
+1. Ir a supabase.com → New project
+2. Nombre del proyecto, contraseña y región (elegir más cercana)
+3. Esperar que se cree el proyecto (~2 min)
+4. Ir a SQL Editor y ejecutar TODO el contenido de supabase_setup.sql
+5. Verificar que se crearon las 4 tablas:
+   - participants
+   - predictions
+   - results
+   - settings
+
+PASO 5: CONECTAR SUPABASE CON LA APP
+1. En Supabase: Settings → API
+2. Copiar "Project URL" y "anon public key"
+3. En js/db.js, reemplazar las primeras líneas:
+   const SUPABASE_URL = 'TU_PROJECT_URL';
+   const SUPABASE_KEY = 'TU_ANON_KEY';
+4. Subir el db.js actualizado a GitHub
+5. Esperar 2-3 min y probar la app
+
+PASO 6: CONFIGURAR CONTRASEÑA DE ADMIN
+1. En admin.html, buscar la línea:
+   const PASS = 'mundial2026admin';
+2. Cambiarla por tu contraseña deseada
+3. Subir admin.html actualizado a GitHub
+
+───────────────────────────────────────────────────────────────────
+PARTE 3 — USO DURANTE EL TORNEO
+───────────────────────────────────────────────────────────────────
+
+ANTES DEL TORNEO (Fase 1 abierta):
+1. Admin crea participantes con nombre + PIN desde admin.html
+2. Admin comparte el link y el PIN a cada compa por WhatsApp
+3. Cada compa ingresa con su nombre + PIN y llena sus 72 predicciones
+4. Cada compa llena su bracket eliminatorio F1
+5. Admin bloquea Fase 1 ANTES del primer partido
+
+DURANTE FASE DE GRUPOS:
+1. Admin ingresa resultados reales partido a partido en admin.html
+2. Los puntos se recalculan automáticamente para todos
+3. El contador muestra X/72 resultados ingresados
+
+AL TERMINAR FASE DE GRUPOS:
+1. Admin abre Fase 2 desde el panel admin
+2. Se aplica penalización automática por equipos no predichos (-2 por cada uno)
+3. Aparece el Bracket F2 con los 32 clasificados REALES
+4. Los compas pueden predecir de nuevo en el Bracket F2
+5. Admin bloquea Fase 2 antes de la Ronda de 32
+
+DURANTE ELIMINATORIAS:
+1. Admin ingresa resultados de cada partido eliminatorio
+2. Los compas ven el bracket avanzar en tiempo real
+3. Los puntos se actualizan automáticamente
+
+───────────────────────────────────────────────────────────────────
+PARTE 4 — SISTEMA DE PUNTOS
+───────────────────────────────────────────────────────────────────
+
+GRUPOS:
+  +3  Resultado exacto
+  +1  Solo ganador/empate correcto
+
+CLASIFICACIÓN DE GRUPOS (al terminar grupos):
+  +10 1° y 2° en orden exacto
+  +6  1° y 2° invertidos
+  +3  Uno de los clasificados o el 3° correcto
+  -2  Por cada equipo real clasificado no predicho (PENALIZACIÓN F2)
+
+ELIMINATORIAS FASE 1:
+  +8  Resultado exacto
+  +5  Solo clasificante correcto
+  -1  Fallo
+  +40 Campeón correcto
+  +20 Subcampeón correcto (predijiste al perdedor de la final como ganador)
+
+ELIMINATORIAS FASE 2:
+  +5  Resultado exacto
+  +3  Solo clasificante correcto
+  0   Fallo (sin penalización)
+  +20 Campeón correcto
+  +10 Subcampeón correcto
+
+PREMIO:
+  65% del bote → 1er lugar
+  35% del bote → 2do lugar
+
+───────────────────────────────────────────────────────────────────
+PARTE 5 — RESETEAR PARA NUEVO TORNEO
+───────────────────────────────────────────────────────────────────
+
+Ejecutar en SQL Editor de Supabase:
+
+  DELETE FROM results;
+  DELETE FROM predictions;
+  DELETE FROM participants;
+  UPDATE settings SET
+    phase = 1,
+    phase1_locked = false,
+    phase2_locked = false,
+    real_classified = null
+  WHERE id = 1;
+
+───────────────────────────────────────────────────────────────────
+PARTE 6 — ADAPTACIÓN PARA MUNDIAL 2030 U OTROS TORNEOS
+───────────────────────────────────────────────────────────────────
+
+VER ARCHIVO: PROMPT_PARA_CLAUDE.txt
+Contiene las instrucciones exactas para pedirle a Claude que
+actualice la app para un nuevo torneo.
+
+Archivos que necesitan actualización manual:
+  js/data.js  → Equipos, grupos, partidos y fechas del nuevo torneo
+  admin.html  → Contraseña del admin
+  js/db.js    → URL y key de Supabase (si es proyecto nuevo)
+
+───────────────────────────────────────────────────────────────────
+PARTE 7 — CREDENCIALES ACTUALES (MUNDIAL 2026)
+───────────────────────────────────────────────────────────────────
+
+Repositorio GitHub: https://github.com/Alastor-LW/Polla-Mundial-FIFA-2026-
+App en vivo:        https://alastor-lw.github.io/Polla-Mundial-FIFA-2026-
+Admin:              https://alastor-lw.github.io/Polla-Mundial-FIFA-2026-/admin.html
+Contraseña admin:   mundial2026admin
+Supabase URL:       https://jgybhnyhdniwarnwolrs.supabase.co
+Supabase proyecto:  Polla-mundial-2026-LW
+
+═══════════════════════════════════════════════════════════════════
