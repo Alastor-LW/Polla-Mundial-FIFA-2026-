@@ -192,11 +192,11 @@ async function showBreakdown(pid,name){
 function closeModal(e){if(e.target.id==='modal')document.getElementById('modal').classList.remove('open');}
 
 function updatePrize(){
-  const n=allParticipants.length,t=n*10;
+  const n=allParticipants.length,t=n*5;
   document.getElementById('p1').textContent='$'+Math.round(t*.65);
   document.getElementById('p2').textContent='$'+Math.round(t*.35);
   const paid=allParticipants.filter(p=>p.paid).length;
-  document.getElementById('pNote').textContent=`${n} inscritos · ${paid} pagados · Bote confirmado: $${paid*10} USD`;
+  document.getElementById('pNote').textContent=`${n} inscritos · ${paid} pagados · Bote confirmado: $${paid*5} USD`;
 }
 
 function logout(){
