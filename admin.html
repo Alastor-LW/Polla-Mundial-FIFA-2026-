@@ -265,6 +265,10 @@ async function saveRes(){
   const msg = document.getElementById('resMsg');
   if (!mid) { msg.innerHTML='<div class="alert alert-error">Selecciona el partido</div>'; return; }
   if (isNaN(h)||isNaN(a)) { msg.innerHTML='<div class="alert alert-error">Ingresa ambos marcadores</div>'; return; }
+  if (mid >= 101 && h === a) {
+    msg.innerHTML='<div class="alert alert-error">⚠️ En eliminatorias no hay empates — ingresa el resultado definitivo (si fue penales, suma el gol decisivo al ganador).</div>';
+    return;
+  }
   msg.innerHTML = '<div class="alert alert-info">Guardando y recalculando...</div>';
 
   try {
@@ -339,7 +343,8 @@ async function loadResults(){
     if (!s) return null;
     const h = parseInt(s.h), a = parseInt(s.a);
     if (isNaN(h)||isNaN(a)) return null;
-    return h >= a ? home : away;
+    if (h === a) return null; // sin empates en eliminatorias
+    return h > a ? home : away;
   }
 
   // Build R32 results

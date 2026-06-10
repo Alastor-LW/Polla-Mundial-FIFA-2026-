@@ -188,7 +188,8 @@ function winner(id,home,away,scores){
   if(!s||s.h===undefined||s.h===null||s.h==='') return null;
   const h=parseInt(s.h),a=parseInt(s.a);
   if(isNaN(h)||isNaN(a)) return null;
-  return h>=a?home:away;
+  if(h===a) return null; // en eliminatorias no hay empates: nadie avanza
+  return h>a?home:away;
 }
 
 function buildBracket(r32teams,elimScores){

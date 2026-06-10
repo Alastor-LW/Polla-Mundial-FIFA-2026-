@@ -359,18 +359,40 @@ function drawBracketF1() {
   document.getElementById('bracketF1Container').innerHTML = html;
 }
 
+// Nombres de los equipos de un partido del bracket, leídos del DOM
+function bracketMatchTeams(prefix, id) {
+  const el = document.getElementById(prefix + id);
+  const spans = el?.closest('.bracket-match')?.querySelectorAll('.bracket-team > span');
+  return spans && spans.length >= 2 ? `${spans[0].textContent} vs ${spans[1].textContent}` : `partido ${id}`;
+}
+
+// Devuelve la lista de partidos con empate (inválido en eliminatorias)
+function collectElimScores(prefix, target) {
+  const ties = [];
+  ELIM_IDS.forEach(id => {
+    const hEl = document.getElementById(prefix + 'h' + id);
+    const aEl = document.getElementById(prefix + 'a' + id);
+    if (hEl && hEl.value !== '') {
+      const h = parseInt(hEl.value), a = parseInt(aEl?.value ?? '0');
+      if (isNaN(h) || isNaN(a)) return;
+      if (h === a) { ties.push(bracketMatchTeams(prefix + 'h', id)); return; }
+      target[id] = { h, a };
+    }
+  });
+  return ties;
+}
+
 async function saveBracketF1() {
   const btn = document.getElementById('saveBracketF1Btn');
   btn.disabled = true; btn.textContent = 'Guardando...';
 
-  ELIM_IDS.forEach(id => {
-    const hEl = document.getElementById('f1h' + id);
-    const aEl = document.getElementById('f1a' + id);
-    if (hEl && hEl.value !== '') {
-      const h = parseInt(hEl.value), a = parseInt(aEl?.value ?? '0');
-      if (!isNaN(h) && !isNaN(a)) myElimScoresF1[id] = { h, a };
-    }
-  });
+  const ties = collectElimScores('f1', myElimScoresF1);
+  if (ties.length) {
+    document.getElementById('bracketF1SaveMsg').innerHTML =
+      `<div class="alert alert-error">⚠️ En eliminatorias no hay empates — debe haber un ganador. Corrige: <strong>${ties.join(', ')}</strong></div>`;
+    btn.disabled = false; btn.textContent = '💾 Guardar predicciones Fase 1';
+    return;
+  }
 
   try {
     const preds = Object.entries(myElimScoresF1).map(([id, s]) => ({
@@ -421,8 +443,10 @@ function mBoxEditable(m, scores) {
   const hW = m.winner && m.winner === m.home && m.home !== '?';
   const aW = m.winner && m.winner === m.away && m.away !== '?';
   const slot = m.label ? `<div style="font-size:.62rem;color:var(--gray);text-align:center;padding:3px 0 1px;letter-spacing:.5px">${m.label}</div>` : '';
-  return `<div class="bracket-match ${m.winner?'done':''}">
-    ${slot}
+  const tied = hv !== '' && av !== '' && parseInt(hv) === parseInt(av);
+  const tieWarn = tied ? '<div style="font-size:.62rem;color:var(--red);text-align:center;padding:2px 0;font-weight:700">⚠️ Empate — debe haber un ganador</div>' : '';
+  return `<div class="bracket-match ${m.winner?'done':''}" style="${tied?'border-color:var(--red)':''}">
+    ${slot}${tieWarn}
     <div class="bracket-team ${hW?'winner':''}">
       <span style="flex:1;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.home||'?'}</span>
       <input class="bracket-input" type="number" min="0" max="20" id="${phase===1?'f1h':'f2h'}${m.id}" value="${hv}" placeholder="—">
@@ -471,15 +495,13 @@ async function saveBracketF2() {
   const btn = document.getElementById('saveBracketBtn');
   btn.disabled = true; btn.textContent = 'Guardando...';
 
-  // Collect F2 inputs
-  ELIM_IDS.forEach(id => {
-    const hEl = document.getElementById('f2h' + id);
-    const aEl = document.getElementById('f2a' + id);
-    if (hEl && hEl.value !== '') {
-      const h = parseInt(hEl.value), a = parseInt(aEl?.value ?? '0');
-      if (!isNaN(h) && !isNaN(a)) myElimScoresF2[id] = { h, a };
-    }
-  });
+  const ties = collectElimScores('f2', myElimScoresF2);
+  if (ties.length) {
+    document.getElementById('bracketF2SaveMsg').innerHTML =
+      `<div class="alert alert-error">⚠️ En eliminatorias no hay empates — debe haber un ganador. Corrige: <strong>${ties.join(', ')}</strong></div>`;
+    btn.disabled = false; btn.textContent = '💾 Guardar predicciones Fase 2';
+    return;
+  }
 
   try {
     const preds = Object.entries(myElimScoresF2).map(([id, s]) => ({
