@@ -232,6 +232,13 @@ async function populateMatchSelect(){
       { label:'SEMIFINALES (15–16 Jul)', ids: ELIM_IDS.slice(28,30) },
       { label:'FINAL & 3er PUESTO', ids: ELIM_IDS.slice(30,32) },
     ];
+    // Equipos conocidos por partido (para deshabilitar rondas aún no definidas)
+    function getMatchTeams(id) {
+      const et = window._elimTeams;
+      if (!et) return null;
+      return [...et.r32, ...et.r16, ...et.qf, ...et.sf, et.final, et.third].find(m => m.id === id) || null;
+    }
+
     elimGroups.forEach(eg => {
       const og = document.createElement('optgroup');
       og.label = eg.label;
@@ -239,6 +246,11 @@ async function populateMatchSelect(){
         const o = document.createElement('option');
         o.value = id;
         o.textContent = getMatchName(id);
+        const t = getMatchTeams(id);
+        if (id >= 117 && (!t || t.home === '?' || t.away === '?')) {
+          o.disabled = true;
+          o.textContent = `⏳ ${o.textContent} — por definir (falta la ronda anterior)`;
+        }
         og.appendChild(o);
       });
       sel.appendChild(og);
@@ -268,6 +280,14 @@ async function saveRes(){
   if (mid >= 101 && h === a) {
     msg.innerHTML='<div class="alert alert-error">⚠️ En eliminatorias no hay empates — ingresa el resultado definitivo (si fue penales, suma el gol decisivo al ganador).</div>';
     return;
+  }
+  if (mid >= 117) {
+    const et = window._elimTeams;
+    const t = et ? [...et.r16, ...et.qf, ...et.sf, et.final, et.third].find(x => x.id === mid) : null;
+    if (!t || t.home === '?' || t.away === '?') {
+      msg.innerHTML='<div class="alert alert-error">⏳ Este partido aún no tiene equipos definidos — ingresa primero todos los resultados de la ronda anterior.</div>';
+      return;
+    }
   }
   msg.innerHTML = '<div class="alert alert-info">Guardando y recalculando...</div>';
 
