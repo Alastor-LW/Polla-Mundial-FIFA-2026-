@@ -1,0 +1,475 @@
+<!DOCTYPE html><html lang="es"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin · Polla Mundial 2026</title>
+<link rel="stylesheet" href="css/style.css">
+</head><body>
+<div class="hero" style="padding:22px;background:linear-gradient(135deg,#1a0800,#3d1500)">
+  <h1 style="font-size:1.5rem">🔧 Panel de Admin</h1>
+  <p class="sub" style="color:var(--gold)">Solo para el administrador</p>
+</div>
+<nav><a href="index.html">🏠 Inicio</a><a href="leaderboard.html">🏆 Tabla</a><a href="admin.html" class="active" style="color:var(--gold)">🔧 Admin</a></nav>
+<div class="container">
+
+  <div id="loginCard">
+    <div class="card">
+      <h2>🔐 Acceso Admin</h2>
+      <div class="form-group"><label>Contraseña</label><input type="password" id="adminPass" placeholder="Contraseña"></div>
+      <div id="loginMsg"></div>
+      <button class="btn btn-gold btn-block" onclick="login()">Entrar</button>
+    </div>
+  </div>
+
+  <div id="adminPanel" style="display:none">
+    <div class="alert alert-warn">🔧 Admin activo · Los puntos se recalculan automáticamente al guardar resultados</div>
+
+    <!-- ESTADO -->
+    <div class="card">
+      <h2>📊 Estado</h2>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;text-align:center">
+        <div><div style="font-size:1.6rem;font-weight:700;color:var(--accent)" id="sParts">—</div><div class="text-gray" style="font-size:.78rem">Participantes</div></div>
+        <div><div style="font-size:1.6rem;font-weight:700;color:var(--green)" id="sResults">—</div><div class="text-gray" style="font-size:.78rem">Resultados grupos</div></div>
+        <div><div style="font-size:1.6rem;font-weight:700;color:var(--gold)" id="sPaid">—</div><div class="text-gray" style="font-size:.78rem">Pagados</div></div>
+      </div>
+    </div>
+
+    <!-- CONTROL DE FASE -->
+    <div class="card">
+      <h2>🔄 Control de Fase</h2>
+      <p class="text-gray" style="font-size:.85rem;margin-bottom:14px">Fase actual: <strong class="text-gold" id="curPhase">—</strong></p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <button class="btn btn-primary" onclick="setPhase(1,'open')">✅ Abrir Fase 1</button>
+        <button class="btn btn-red" onclick="setPhase(1,'lock')">🔒 Bloquear Fase 1</button>
+        <button class="btn btn-gold" onclick="setPhase(2,'open')">✅ Abrir Fase 2</button>
+        <button class="btn btn-red" onclick="setPhase(2,'lock')">🔒 Bloquear Fase 2</button>
+      </div>
+      <div id="phaseMsg"></div>
+      <p class="text-gray" style="font-size:.78rem;margin-top:8px">
+        🔒 Bloquear impide que los participantes hagan más cambios en esa fase
+      </p>
+    </div>
+
+    <!-- INGRESAR RESULTADO -->
+    <div class="card">
+      <h2>⚽ Ingresar resultado real</h2>
+      <div class="form-group">
+        <label>Partido</label>
+        <select id="matchSel"><option value="">-- Selecciona --</option></select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 30px 1fr;gap:10px;align-items:end;margin-bottom:14px">
+        <div><label id="homeLabel">Local</label><input type="number" id="homeRes" min="0" max="20" placeholder="0"></div>
+        <div style="text-align:center;padding-bottom:10px;color:var(--gray)">—</div>
+        <div><label id="awayLabel">Visitante</label><input type="number" id="awayRes" min="0" max="20" placeholder="0"></div>
+      </div>
+      <div id="resMsg"></div>
+      <button class="btn btn-gold btn-block" onclick="saveRes()">💾 Guardar resultado y recalcular puntos</button>
+    </div>
+
+    <!-- RESULTADOS INGRESADOS -->
+    <div class="card">
+      <h2>✅ Resultados ingresados <span class="text-gray" style="font-size:.82rem" id="resultCount"></span></h2>
+      <div id="resultsList"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+
+    <!-- PARTICIPANTES -->
+    <div class="card">
+      <h2>👥 Participantes</h2>
+      <!-- Crear participante -->
+      <div style="display:grid;grid-template-columns:1fr 90px auto;gap:10px;margin-bottom:8px">
+        <input type="text" id="newParticipantName" onkeydown="if(event.key==='Enter')createParticipant()" placeholder="Nombre del compa..." maxlength="40">
+        <input type="text" id="newParticipantPin" placeholder="PIN" maxlength="4" inputmode="numeric" style="text-align:center;letter-spacing:4px;font-weight:700;font-size:1.1rem" onkeydown="if(event.key==='Enter')createParticipant()">
+        <button class="btn btn-primary" onclick="createParticipant()">➕ Agregar</button>
+      </div>
+      <p class="text-gray" style="font-size:.78rem;margin-bottom:12px">💡 PIN de 4 dígitos · Mándaselo al compa por WhatsApp junto con su nombre exacto</p>
+      <div id="createMsg" style="margin-bottom:8px"></div>
+      <div id="partsList"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/data.js"></script>
+<script src="js/db.js"></script>
+<script>
+const PASS='mundial2026admin';
+let allResults=[], currentPhase=1, settings={};
+
+function login(){
+  if(document.getElementById('adminPass').value===PASS){
+    document.getElementById('loginCard').style.display='none';
+    document.getElementById('adminPanel').style.display='block';
+    initAdmin();
+  } else {
+    document.getElementById('loginMsg').innerHTML='<div class="alert alert-error">Contraseña incorrecta</div>';
+  }
+}
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('loginCard').style.display!=='none')login();});
+
+async function initAdmin(){
+  await loadSettings();
+  populateMatchSelect();
+  await Promise.all([loadStats(),loadResults(),loadParticipants()]);
+}
+
+async function loadSettings(){
+  settings = await dbGetSettings();
+  currentPhase = settings.phase || 1;
+  const locked1 = settings.phase1_locked || false;
+  const locked2 = settings.phase2_locked || false;
+  document.getElementById('curPhase').innerHTML =
+    `Fase ${currentPhase} · F1: ${locked1?'🔒 Bloqueada':'🟢 Abierta'} · F2: ${locked2?'🔒 Bloqueada':'🟢 Abierta'}`;
+}
+
+async function setPhase(phase, action){
+  try {
+    const newSettings = { ...settings };
+    if (action === 'open') {
+      newSettings.phase = phase;
+      if (phase === 1) newSettings.phase1_locked = false;
+      else newSettings.phase2_locked = false;
+    } else {
+      if (phase === 1) newSettings.phase1_locked = true;
+      else newSettings.phase2_locked = true;
+    }
+    await dbSaveSettings(newSettings);
+    settings = newSettings;
+    await loadSettings();
+    // Repopulate match selector based on new phase
+    populateMatchSelect();
+    document.getElementById('phaseMsg').innerHTML =
+      `<div class="alert alert-success">✅ ${action==='open'?'Fase '+phase+' abierta':'Fase '+phase+' bloqueada'}</div>`;
+  } catch(e) {
+    document.getElementById('phaseMsg').innerHTML=`<div class="alert alert-error">Error: ${e.message}</div>`;
+  }
+}
+
+async function populateMatchSelect(){
+  const sel = document.getElementById('matchSel');
+  sel.innerHTML = '<option value="">-- Selecciona --</option>';
+  const phase = settings.phase || 1;
+
+  if (phase === 1) {
+    // Only group matches (IDs 1-72)
+    const byGroup = {};
+    GROUP_MATCHES.forEach(m => {
+      if (!byGroup[m.group]) byGroup[m.group] = [];
+      byGroup[m.group].push(m);
+    });
+    Object.entries(byGroup).forEach(([grp, matches]) => {
+      const og = document.createElement('optgroup');
+      og.label = `GRUPO ${grp}`;
+      matches.forEach(m => {
+        const o = document.createElement('option');
+        o.value = m.id;
+        o.textContent = `${m.date} | ${m.home} vs ${m.away}`;
+        og.appendChild(o);
+      });
+      sel.appendChild(og);
+    });
+  } else {
+    // Build real team names from actual results
+    const realResults = await dbGetResults();
+    const realGroupScores = {};
+    realResults.filter(r => r.match_id <= 72).forEach(r => {
+      realGroupScores[r.match_id] = { home: r.home_score, away: r.away_score };
+    });
+    const realGrouped = calcStandings(realGroupScores);
+    const realQ = getQualified(realGrouped);
+    const r32 = buildR32(realQ);
+
+    // Build bracket structure with team names
+    function getMatchName(id) {
+      // Use pre-computed elim teams if available (after results loaded)
+      const et = window._elimTeams;
+      if (et) {
+        const allM = [...et.r32, ...et.r16, ...et.qf, ...et.sf, et.final, et.third];
+        const found = allM.find(m => m.id === id);
+        if (found && found.home !== '?' && found.away !== '?') {
+          return `${found.home} vs ${found.away}`;
+        }
+      }
+      // Fallback to R32 names from real classified
+      const r32m = r32.find(m => m.id === id);
+      if (r32m) return `${r32m.home} vs ${r32m.away}`;
+      const r16map = {
+        117: [r32[0], r32[1]], 118: [r32[2], r32[3]],
+        119: [r32[4], r32[5]], 120: [r32[6], r32[7]],
+        121: [r32[8], r32[9]], 122: [r32[10], r32[11]],
+        123: [r32[12], r32[13]], 124: [r32[14], r32[15]],
+      };
+      if (r16map[id]) {
+        const a = r16map[id][0], b = r16map[id][1];
+        return `G.${a.home||'?'} vs G.${b.home||'?'}`;
+      }
+      if (id === 131) return 'FINAL';
+      if (id === 132) return '3er PUESTO';
+      return `Partido #${id}`;
+    }
+
+    const elimGroups = [
+      { label:'RONDA DE 32 (28 Jun–2 Jul)', ids: ELIM_IDS.slice(0,16) },
+      { label:'OCTAVOS DE FINAL (6–9 Jul)', ids: ELIM_IDS.slice(16,24) },
+      { label:'CUARTOS DE FINAL (11–12 Jul)', ids: ELIM_IDS.slice(24,28) },
+      { label:'SEMIFINALES (15–16 Jul)', ids: ELIM_IDS.slice(28,30) },
+      { label:'FINAL & 3er PUESTO', ids: ELIM_IDS.slice(30,32) },
+    ];
+    elimGroups.forEach(eg => {
+      const og = document.createElement('optgroup');
+      og.label = eg.label;
+      eg.ids.forEach(id => {
+        const o = document.createElement('option');
+        o.value = id;
+        o.textContent = getMatchName(id);
+        og.appendChild(o);
+      });
+      sel.appendChild(og);
+    });
+  }
+
+  sel.addEventListener('change', () => {
+    const id = parseInt(sel.value);
+    const m = GROUP_MATCHES.find(x => x.id === id);
+    if (m) {
+      document.getElementById('homeLabel').textContent = m.home;
+      document.getElementById('awayLabel').textContent = m.away;
+    } else {
+      document.getElementById('homeLabel').textContent = 'Local';
+      document.getElementById('awayLabel').textContent = 'Visitante';
+    }
+  });
+}
+
+async function saveRes(){
+  const mid = parseInt(document.getElementById('matchSel').value);
+  const h = parseInt(document.getElementById('homeRes').value);
+  const a = parseInt(document.getElementById('awayRes').value);
+  const msg = document.getElementById('resMsg');
+  if (!mid) { msg.innerHTML='<div class="alert alert-error">Selecciona el partido</div>'; return; }
+  if (isNaN(h)||isNaN(a)) { msg.innerHTML='<div class="alert alert-error">Ingresa ambos marcadores</div>'; return; }
+  msg.innerHTML = '<div class="alert alert-info">Guardando y recalculando...</div>';
+
+  try {
+    await dbSaveResult(mid, h, a);
+    // Recalculate all participants
+    allResults = await dbGetResults();
+    const resultMap = {};
+    allResults.forEach(r => resultMap[r.match_id] = { h: r.home_score, a: r.away_score });
+
+    const [parts, allPreds] = await Promise.all([dbGetParticipants(), dbGetAllPredictions()]);
+
+    // Calculate real classified from actual results
+    const realGroupScores = {};
+    allResults.filter(r => r.match_id <= 72).forEach(r => {
+      realGroupScores[r.match_id] = { home: r.home_score, away: r.away_score };
+    });
+    const realGrouped = calcStandings(realGroupScores);
+    const realClassified = getQualified(realGrouped);
+
+    for (const p of parts) {
+      const myPreds = allPreds.filter(x => x.participant_id === p.id);
+      const bd = calcAllPoints(myPreds, resultMap, realClassified);
+      await dbUpdatePoints(p.id, bd.total, bd);
+    }
+
+    msg.innerHTML = '<div class="alert alert-success">✅ Resultado guardado · Puntos recalculados para todos</div>';
+    await Promise.all([loadStats(), loadResults(), loadParticipants()]);
+  } catch(e) {
+    msg.innerHTML = `<div class="alert alert-error">❌ ${e.message}</div>`;
+  }
+}
+
+async function loadStats(){
+  const [parts, results] = await Promise.all([dbGetParticipants(), dbGetResults()]);
+  const groupResults = results.filter(r => r.match_id <= 72);
+  document.getElementById('sParts').textContent = parts.length;
+  document.getElementById('sResults').textContent = `${groupResults.length}/72`;
+  document.getElementById('sPaid').textContent = parts.filter(p => p.paid).length;
+}
+
+async function loadResults(){
+  allResults = await dbGetResults();
+  const resultMap = {};
+  allResults.forEach(r => resultMap[r.match_id] = r);
+  const groupResults = allResults.filter(r => r.match_id <= 72);
+  const elimResults = allResults.filter(r => r.match_id >= 101);
+
+  document.getElementById('resultCount').textContent = 
+    `(Grupos: ${groupResults.length}/72 · Elim: ${elimResults.length})`;
+
+  // Build elim match names from real results
+  const realGroupScores = {};
+  groupResults.forEach(r => {
+    realGroupScores[r.match_id] = { home: r.home_score, away: r.away_score };
+  });
+  const realGrouped = calcStandings(realGroupScores);
+  const realQ = getQualified(realGrouped);
+  const r32teams = buildR32(realQ);
+
+  // Build elim scores map for winner calculation
+  const elimScores = {};
+  elimResults.forEach(r => {
+    elimScores[r.match_id] = { h: r.home_score, a: r.away_score };
+  });
+
+  // Winner function
+  function getWin(id, home, away) {
+    const s = elimScores[id];
+    if (!s) return null;
+    const h = parseInt(s.h), a = parseInt(s.a);
+    if (isNaN(h)||isNaN(a)) return null;
+    return h >= a ? home : away;
+  }
+
+  // Build R32 results
+  const r32Results = r32teams.map(m => ({
+    id: m.id, home: m.home, away: m.away,
+    winner: getWin(m.id, m.home, m.away)
+  }));
+
+  // Build R16
+  const r16teams = [
+    {id:117, home:r32Results[0]?.winner||'?', away:r32Results[1]?.winner||'?'},
+    {id:118, home:r32Results[2]?.winner||'?', away:r32Results[3]?.winner||'?'},
+    {id:119, home:r32Results[4]?.winner||'?', away:r32Results[5]?.winner||'?'},
+    {id:120, home:r32Results[6]?.winner||'?', away:r32Results[7]?.winner||'?'},
+    {id:121, home:r32Results[8]?.winner||'?', away:r32Results[9]?.winner||'?'},
+    {id:122, home:r32Results[10]?.winner||'?', away:r32Results[11]?.winner||'?'},
+    {id:123, home:r32Results[12]?.winner||'?', away:r32Results[13]?.winner||'?'},
+    {id:124, home:r32Results[14]?.winner||'?', away:r32Results[15]?.winner||'?'},
+  ].map(m => ({...m, winner: getWin(m.id, m.home, m.away)}));
+
+  // Build QF
+  const qfteams = [
+    {id:125, home:r16teams[0]?.winner||'?', away:r16teams[1]?.winner||'?'},
+    {id:126, home:r16teams[2]?.winner||'?', away:r16teams[3]?.winner||'?'},
+    {id:127, home:r16teams[4]?.winner||'?', away:r16teams[5]?.winner||'?'},
+    {id:128, home:r16teams[6]?.winner||'?', away:r16teams[7]?.winner||'?'},
+  ].map(m => ({...m, winner: getWin(m.id, m.home, m.away)}));
+
+  // Build SF
+  const sfteams = [
+    {id:129, home:qfteams[0]?.winner||'?', away:qfteams[1]?.winner||'?'},
+    {id:130, home:qfteams[2]?.winner||'?', away:qfteams[3]?.winner||'?'},
+  ].map(m => {
+    const w = getWin(m.id, m.home, m.away);
+    return {...m, winner: w, loser: w?(w===m.home?m.away:m.home):null};
+  });
+
+  // Final & 3P
+  const finalMatch = {id:131, home:sfteams[0]?.winner||'?', away:sfteams[1]?.winner||'?'};
+  finalMatch.winner = getWin(131, finalMatch.home, finalMatch.away);
+  const thirdMatch = {id:132, home:sfteams[0]?.loser||'?', away:sfteams[1]?.loser||'?'};
+  thirdMatch.winner = getWin(132, thirdMatch.home, thirdMatch.away);
+
+  // Store for selector update
+  window._elimTeams = {r32:r32Results, r16:r16teams, qf:qfteams, sf:sfteams, final:finalMatch, third:thirdMatch};
+
+  // Refresh selector with real names
+  await populateMatchSelect();
+
+  let html = '';
+  let num = 1;
+
+  // Group results
+  if (groupResults.length > 0) {
+    html += `<div style="color:var(--accent);font-size:.82rem;font-weight:700;padding:8px 0 4px">⚽ GRUPOS (${groupResults.length}/72)</div>`;
+    GROUP_MATCHES.forEach(m => {
+      const r = resultMap[m.id];
+      if (!r) return;
+      html += `<div style="display:grid;grid-template-columns:30px 1fr auto;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:.83rem;align-items:center">
+        <span class="text-gray" style="font-size:.75rem">${num++}</span>
+        <span>${m.home} vs ${m.away}</span>
+        <strong class="text-gold">${r.home_score} — ${r.away_score}</strong>
+      </div>`;
+    });
+  }
+
+  // Elim results
+  if (elimResults.length > 0) {
+    html += `<div style="color:var(--gold);font-size:.82rem;font-weight:700;padding:12px 0 4px">🔱 ELIMINATORIAS (${elimResults.length})</div>`;
+    const allElimTeams = [
+      ...r32Results, ...r16teams, ...qfteams, ...sfteams, finalMatch, thirdMatch
+    ];
+    allElimTeams.forEach(m => {
+      const r = resultMap[m.id];
+      if (!r) return;
+      const label = m.id >= 131 ? (m.id===131?'🏆 Final':'🥉 3er Puesto') :
+                    m.id >= 129 ? '🔱 SF' :
+                    m.id >= 125 ? '🔱 QF' :
+                    m.id >= 117 ? '🔱 Octavos' : '🔱 R32';
+      html += `<div style="display:grid;grid-template-columns:80px 1fr auto;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:.83rem;align-items:center">
+        <span class="text-gray" style="font-size:.75rem">${label}</span>
+        <span>${m.home} vs ${m.away}</span>
+        <strong class="text-gold">${r.home_score} — ${r.away_score}</strong>
+      </div>`;
+    });
+  }
+
+  document.getElementById('resultsList').innerHTML = html ||
+    '<p class="text-gray" style="padding:12px">Sin resultados aún</p>';
+}
+
+async function loadParticipants(){
+  const parts = await dbGetParticipants();
+  let html = '';
+  parts.forEach(p => {
+    html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);gap:8px;flex-wrap:wrap">
+      <div>
+        <strong>${p.name}</strong> <span class="text-gold">${p.total_points}pts</span>
+        <span style="margin-left:10px;background:var(--bg);border:1px solid var(--border);padding:2px 8px;border-radius:4px;font-size:.8rem;font-family:monospace;color:var(--accent)">PIN: ${p.pin||'----'}</span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm ${p.paid?'btn-primary':'btn-gold'}" onclick="togglePaid('${p.id}',${p.paid})">
+          ${p.paid?'✅ Pagado':'⏳ Marcar pago'}
+        </button>
+        <button class="btn btn-sm btn-red" onclick="deleteParticipant('${p.id}','${p.name}')">
+          🗑️ Eliminar
+        </button>
+      </div>
+    </div>`;
+  });
+  document.getElementById('partsList').innerHTML = html ||
+    '<p class="text-gray" style="padding:10px">Sin participantes</p>';
+}
+
+async function createParticipant(){
+  const nameInput = document.getElementById('newParticipantName');
+  const pinInput  = document.getElementById('newParticipantPin');
+  const name = nameInput.value.trim();
+  const pin  = pinInput.value.trim();
+  const msg  = document.getElementById('createMsg');
+  if (!name || name.length < 2) { msg.innerHTML='<div class="alert alert-error">Escribe un nombre válido</div>'; return; }
+  if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) { msg.innerHTML='<div class="alert alert-error">El PIN debe ser exactamente 4 dígitos numéricos</div>'; return; }
+  try {
+    await dbCreateParticipantWithPin(name, pin);
+    nameInput.value = ''; pinInput.value = '';
+    msg.innerHTML=`<div class="alert alert-success">✅ "${name}" agregado · PIN: ${pin} · Mándale estos datos por WhatsApp</div>`;
+    setTimeout(()=>msg.innerHTML='', 6000);
+    await loadParticipants();
+    await loadStats();
+  } catch(e) {
+    if (e.message.includes('unique') || e.message.includes('duplicate')) {
+      msg.innerHTML='<div class="alert alert-error">❌ Ya existe un participante con ese nombre</div>';
+    } else {
+      msg.innerHTML=`<div class="alert alert-error">❌ Error: ${e.message}</div>`;
+    }
+  }
+}
+
+async function togglePaid(id, cur){
+  await dbTogglePaid(id, !cur);
+  await loadParticipants();
+  await loadStats();
+}
+
+async function deleteParticipant(id, name){
+  if (!confirm(`¿Seguro que quieres eliminar a "${name}"?\n\nEsta acción borrará también todas sus predicciones y no se puede deshacer.`)) return;
+  try {
+    await dbDeleteParticipant(id);
+    await loadParticipants();
+    await loadStats();
+  } catch(e) {
+    alert('Error al eliminar: ' + e.message);
+  }
+}
+</script>
+</body></html>
