@@ -67,6 +67,10 @@
       <button class="btn btn-gold btn-block mt-16" id="saveBracketF1Btn" onclick="saveBracketF1()">
         💾 Guardar predicciones Fase 1
       </button>
+      <button class="btn btn-block mt-8" id="resetBracketF1Btn" onclick="resetBracket(1)"
+        style="display:none;background:transparent;border:1px solid var(--red);color:var(--red)">
+        🗑️ Borrar mi bracket F1 y empezar de nuevo
+      </button>
     </div>
 
     <!-- BRACKET F2 (editable con clasificados reales) -->
@@ -83,6 +87,10 @@
       </div>
       <button class="btn btn-gold btn-block mt-16" id="saveBracketBtn" onclick="saveBracketF2()">
         💾 Guardar predicciones Fase 2
+      </button>
+      <button class="btn btn-block mt-8" id="resetBracketF2Btn" onclick="resetBracket(2)"
+        style="display:none;background:transparent;border:1px solid var(--red);color:var(--red)">
+        🗑️ Borrar mi bracket F2 y empezar de nuevo
       </button>
     </div>
   </div>
@@ -320,6 +328,7 @@ async function renderBracketF1() {
     msg.textContent = '📋 Tu predicción Fase 1 — Solo lectura. Verde = acertaste, Rojo = fallaste. El marcador real va entre paréntesis.';
     hint.style.display = 'none';
     saveBtn.style.display = 'none';
+    document.getElementById('resetBracketF1Btn').style.display = 'none';
 
     const realResults = await dbGetResults();
     const realMap = {};
@@ -343,8 +352,32 @@ async function renderBracketF1() {
     msg.textContent = '🎯 Fase 1: Ingresa los resultados eliminatorios. Los ganadores avanzan solos.';
     hint.style.display = 'block';
     saveBtn.style.display = 'block';
+    document.getElementById('resetBracketF1Btn').style.display = Object.keys(myElimScoresF1).length ? 'block' : 'none';
     drawBracketF1();
   }
+}
+
+// ── Borrar bracket completo de una fase (arrepentimiento antes del cierre) ──
+async function resetBracket(ph) {
+  const ids = ph === 1
+    ? { btn: 'resetBracketF1Btn', msg: 'bracketF1SaveMsg' }
+    : { btn: 'resetBracketF2Btn', msg: 'bracketF2SaveMsg' };
+  if (!confirm(`¿Borrar TODAS tus predicciones del bracket Fase ${ph}?\n\nTus predicciones de grupos NO se tocan.\nPodrás volver a llenar el bracket antes del bloqueo.`)) return;
+  const btn = document.getElementById(ids.btn);
+  btn.disabled = true; btn.textContent = 'Borrando...';
+  try {
+    await dbDeleteElimPredictions(participant.id, ph);
+    if (ph === 1) { myElimScoresF1 = {}; drawBracketF1(); }
+    else { myElimScoresF2 = {}; drawBracketF2(); }
+    btn.style.display = 'none';
+    document.getElementById(ids.msg).innerHTML =
+      '<div class="alert alert-success">🗑️ Bracket borrado. Si quieres, ajusta primero tus grupos y luego vuelve a llenarlo — antes del cierre.</div>';
+    setTimeout(() => document.getElementById(ids.msg).innerHTML = '', 7000);
+  } catch(e) {
+    document.getElementById(ids.msg).innerHTML = `<div class="alert alert-error">❌ ${e.message}</div>`;
+  }
+  btn.disabled = false;
+  btn.textContent = `🗑️ Borrar mi bracket F${ph} y empezar de nuevo`;
 }
 
 function drawBracketF1() {
@@ -427,6 +460,7 @@ async function saveBracketF1() {
     document.getElementById('bracketF1SaveMsg').innerHTML =
       '<div class="alert alert-success">✅ ¡Guardado! Los ganadores avanzan.</div>';
     setTimeout(() => document.getElementById('bracketF1SaveMsg').innerHTML = '', 4000);
+    document.getElementById('resetBracketF1Btn').style.display = 'block';
     drawBracketF1();
   } catch(e) {
     document.getElementById('bracketF1SaveMsg').innerHTML =
@@ -455,6 +489,7 @@ async function renderBracketF2() {
     msg.textContent = '📋 Tu predicción Fase 2 — Solo lectura. Verde = acertaste, Rojo = fallaste. El marcador real va entre paréntesis.';
     document.getElementById('bracketF2Hint').style.display = 'none';
     document.getElementById('saveBracketBtn').style.display = 'none';
+    document.getElementById('resetBracketF2Btn').style.display = 'none';
 
     const realResults = await dbGetResults();
     const realMap = {};
@@ -470,6 +505,7 @@ async function renderBracketF2() {
     return;
   }
 
+  document.getElementById('resetBracketF2Btn').style.display = Object.keys(myElimScoresF2).length ? 'block' : 'none';
   drawBracketF2();
 }
 
@@ -552,7 +588,7 @@ async function saveBracketF2() {
     document.getElementById('bracketF2SaveMsg').innerHTML =
       '<div class="alert alert-success">✅ ¡Guardado! Los ganadores avanzan.</div>';
     setTimeout(() => document.getElementById('bracketF2SaveMsg').innerHTML = '', 4000);
-
+    document.getElementById('resetBracketF2Btn').style.display = 'block';
     drawBracketF2();
   } catch(e) {
     document.getElementById('bracketF2SaveMsg').innerHTML =

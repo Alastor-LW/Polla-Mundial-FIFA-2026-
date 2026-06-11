@@ -33,6 +33,12 @@ async function dbGetAllPredictions(){
   const{data,error}=await sb.from('predictions').select('*');
   if(error)throw error; return data||[];
 }
+async function dbDeleteElimPredictions(pid,phase){
+  // Borra SOLO el bracket (partidos 101+) de la fase dada; los grupos no se tocan
+  const{error}=await sb.from('predictions').delete()
+    .eq('participant_id',pid).eq('phase',phase).gte('match_id',101);
+  if(error)throw error;
+}
 async function dbSaveResult(matchId,home,away){
   const{error}=await sb.from('results').upsert({match_id:matchId,home_score:home,away_score:away},{onConflict:'match_id'});
   if(error)throw error;
