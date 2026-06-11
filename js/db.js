@@ -30,8 +30,17 @@ async function dbGetPredictions(pid){
   if(error)throw error; return data||[];
 }
 async function dbGetAllPredictions(){
-  const{data,error}=await sb.from('predictions').select('*');
-  if(error)throw error; return data||[];
+  // Supabase devuelve máximo 1000 filas por consulta; con ~20 participantes
+  // hay ~2000 predicciones, así que hay que paginar o se truncan los datos
+  // (rompía el panel de avance y el recálculo de puntos).
+  const all=[];
+  for(let from=0;;from+=1000){
+    const{data,error}=await sb.from('predictions').select('*').range(from,from+999);
+    if(error)throw error;
+    all.push(...(data||[]));
+    if(!data||data.length<1000)break;
+  }
+  return all;
 }
 async function dbDeleteElimPredictions(pid,phase){
   // Borra SOLO el bracket (partidos 101+) de la fase dada; los grupos no se tocan
