@@ -252,22 +252,24 @@ function mBoxReadonly(m, realMap) {
     hStyle = predWin==='home' ? (realWin==='home' ? 'background:#0d2e1a' : 'background:#2e0d0d') : '';
     aStyle = predWin==='away' ? (realWin==='away' ? 'background:#0d2e1a' : 'background:#2e0d0d') : '';
   }
-  const realScore = real ? `<span style="font-size:.7rem;color:var(--gray);margin-left:4px">(real ${real.h}-${real.a})</span>` : '';
+  // Marcador real por equipo, junto a la predicción: "tu gol (real gol)"
+  const realH = real ? `<span style="font-size:.7rem;color:var(--gray);margin-left:4px">(real ${real.h})</span>` : '';
+  const realA = real ? `<span style="font-size:.7rem;color:var(--gray);margin-left:4px">(real ${real.a})</span>` : '';
   const slot = m.label ? `<div style="font-size:.62rem;color:var(--gray);text-align:center;padding:3px 0 1px;letter-spacing:.5px">${m.label}</div>` : '';
   return `<div class="bracket-match">
     ${slot}
     <div class="bracket-team" style="font-size:.8rem;${hStyle}">
       <span style="flex:1">${m.home||'?'}</span>
-      <span class="bracket-score">${hv}${realScore}</span>
+      <span class="bracket-score">${hv}${realH}</span>
     </div>
     <div class="bracket-team" style="font-size:.8rem;${aStyle}">
       <span style="flex:1">${m.away||'?'}</span>
-      <span class="bracket-score">${av}</span>
+      <span class="bracket-score">${av}${realA}</span>
     </div>
   </div>`;
 }
 
-function drawBracketReadonly(containerId, r32teams, scores, realMap, champLabel) {
+function drawBracketReadonly(containerId, r32teams, scores, realMap, champLabel, realChamp) {
   const bracket = buildBracket(r32teams, scores);
   const rounds = [
     {label:'Ronda de 32<br><small>28 Jun–2 Jul</small>', matches:bracket.r32},
@@ -293,7 +295,10 @@ function drawBracketReadonly(containerId, r32teams, scores, realMap, champLabel)
         border:2px solid ${champ?'var(--gold)':'var(--border)'}">
         <div style="font-size:1.8rem">🏆</div>
         <div style="color:var(--gold);font-weight:700">${champ||'Pendiente'}</div>
-        <div style="color:var(--gray);font-size:.72rem">${champLabel}</div>
+        <div style="color:var(--gray);font-size:.72rem">${champLabel} (tu apuesta)</div>
+        ${realChamp ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:.78rem;color:var(--gray)">
+          Campeón REAL: <strong style="color:${realChamp===champ?'var(--green)':'var(--red)'}">${realChamp}</strong> ${realChamp===champ?'✅':'❌'}
+        </div>` : ''}
       </div>
     </div>
   </div>`;
@@ -319,7 +324,18 @@ async function renderBracketF1() {
     const realResults = await dbGetResults();
     const realMap = {};
     realResults.forEach(r => realMap[r.match_id] = { h: r.home_score, a: r.away_score });
-    drawBracketReadonly('bracketF1Container', r32teamsF1, myElimScoresF1, realMap, 'Tu campeón F1');
+
+    // Campeón real: bracket con clasificados reales + resultados reales
+    let realChamp = null;
+    try {
+      const realQ = await dbGetRealClassified();
+      const realElim = {};
+      realResults.filter(r => r.match_id >= 101).forEach(r => realElim[r.match_id] = { h: r.home_score, a: r.away_score });
+      const rc = buildBracket(buildR32(realQ), realElim).final.winner;
+      if (rc && rc !== '?') realChamp = rc;
+    } catch(e) {}
+
+    drawBracketReadonly('bracketF1Container', r32teamsF1, myElimScoresF1, realMap, 'Tu campeón F1', realChamp);
 
   } else {
     // EDITABLE MODE: phase 1 open
@@ -443,7 +459,14 @@ async function renderBracketF2() {
     const realResults = await dbGetResults();
     const realMap = {};
     realResults.forEach(r => realMap[r.match_id] = { h: r.home_score, a: r.away_score });
-    drawBracketReadonly('bracketF2Container', r32teamsReal, myElimScoresF2, realMap, 'Tu campeón F2');
+
+    // Campeón real: r32teamsReal ya son los clasificados reales
+    const realElim = {};
+    realResults.filter(r => r.match_id >= 101).forEach(r => realElim[r.match_id] = { h: r.home_score, a: r.away_score });
+    const rc = buildBracket(r32teamsReal, realElim).final.winner;
+    const realChamp = rc && rc !== '?' ? rc : null;
+
+    drawBracketReadonly('bracketF2Container', r32teamsReal, myElimScoresF2, realMap, 'Tu campeón F2', realChamp);
     return;
   }
 
