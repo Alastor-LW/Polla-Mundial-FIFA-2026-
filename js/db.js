@@ -20,7 +20,9 @@ async function dbDeleteParticipant(id){
 }
 async function dbSavePredictions(pid,preds){
   const rows=preds.map(p=>({participant_id:pid,...p}));
-  const{error}=await sb.from('predictions').upsert(rows,{onConflict:'participant_id,match_id'});
+  // Una fila por (participante, partido, FASE): el bracket F2 no debe
+  // sobrescribir las predicciones F1 del mismo partido.
+  const{error}=await sb.from('predictions').upsert(rows,{onConflict:'participant_id,match_id,phase'});
   if(error)throw error;
 }
 async function dbGetPredictions(pid){
