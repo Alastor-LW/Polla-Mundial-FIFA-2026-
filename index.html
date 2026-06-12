@@ -95,8 +95,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (saved) {
     try {
       const p = JSON.parse(saved);
-      // Verify still exists in DB
-      const fresh = await dbGetParticipant(p.name);
+      // Verify still exists in DB (revalida nombre+PIN en el servidor)
+      const fresh = await dbVerifyLogin(p.name, p.pin);
       if (fresh) {
         localStorage.setItem('polla_p', JSON.stringify(fresh));
         showWelcome(fresh);
@@ -117,13 +117,9 @@ async function handleLogin() {
   if (pin.length < 4)  { showMsg('Ingresa tu PIN de 4 dígitos', 'error'); return; }
   showMsg('Verificando...', 'info');
   try {
-    const p = await dbGetParticipant(name);
+    const p = await dbVerifyLogin(name, pin);
     if (!p) {
-      showMsg('❌ Nombre no encontrado. Verifica o contacta al admin.', 'error');
-      return;
-    }
-    if (p.pin !== pin) {
-      showMsg('❌ PIN incorrecto. Verifica o contacta al admin.', 'error');
+      showMsg('❌ Nombre o PIN incorrecto. Verifica o contacta al admin.', 'error');
       return;
     }
     localStorage.setItem('polla_p', JSON.stringify(p));

@@ -2,27 +2,30 @@ const SUPABASE_URL='https://jgybhnyhdniwarnwolrs.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpneWJobnloZG5pd2FybndvbHJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzg1NTYsImV4cCI6MjA5NDg1NDU1Nn0.vzFrYYw0042L4rI3P71WdZWH_n6h7A48344_CPeLgvU';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
+// ── Credenciales locales: el PIN del participante logueado y la
+// contraseña del admin viajan a funciones del SERVIDOR que las validan.
+// La clave anónima por sí sola no puede escribir nada (ver security_*.sql).
+function _myPin(){
+  try{return JSON.parse(localStorage.getItem('polla_p')||'{}').pin||'';}catch(e){return '';}
+}
+function _adminPass(){ return sessionStorage.getItem('polla_admin')||''; }
+
 async function dbGetParticipants(){
-  const{data,error}=await sb.from('participants').select('*').order('total_points',{ascending:false});
+  const{data,error}=await sb.from('participants')
+    .select('id,name,total_points,paid,breakdown,created_at')
+    .order('total_points',{ascending:false});
   if(error)throw error; return data||[];
 }
-async function dbGetParticipant(name){
-  const{data,error}=await sb.from('participants').select('*').ilike('name',name).maybeSingle();
-  if(error)throw error; return data;
-}
-async function dbCreateParticipant(name){
-  const{data,error}=await sb.from('participants').insert({name,total_points:0,paid:false}).select().single();
-  if(error)throw error; return data;
+async function dbVerifyLogin(name,pin){
+  const{data,error}=await sb.rpc('verify_login',{p_name:name,p_pin:pin});
+  if(error)throw error; return (data&&data[0])||null;
 }
 async function dbDeleteParticipant(id){
-  const{error}=await sb.from('participants').delete().eq('id',id);
+  const{error}=await sb.rpc('admin_delete_participant',{p_pass:_adminPass(),p_id:id});
   if(error)throw error;
 }
 async function dbSavePredictions(pid,preds){
-  const rows=preds.map(p=>({participant_id:pid,...p}));
-  // Una fila por (participante, partido, FASE): el bracket F2 no debe
-  // sobrescribir las predicciones F1 del mismo partido.
-  const{error}=await sb.from('predictions').upsert(rows,{onConflict:'participant_id,match_id,phase'});
+  const{error}=await sb.rpc('save_predictions',{p_pid:pid,p_pin:_myPin(),p_rows:preds});
   if(error)throw error;
 }
 async function dbGetPredictions(pid){
@@ -44,12 +47,11 @@ async function dbGetAllPredictions(){
 }
 async function dbDeleteElimPredictions(pid,phase){
   // Borra SOLO el bracket (partidos 101+) de la fase dada; los grupos no se tocan
-  const{error}=await sb.from('predictions').delete()
-    .eq('participant_id',pid).eq('phase',phase).gte('match_id',101);
+  const{error}=await sb.rpc('delete_bracket',{p_pid:pid,p_pin:_myPin(),p_phase:phase});
   if(error)throw error;
 }
 async function dbSaveResult(matchId,home,away){
-  const{error}=await sb.from('results').upsert({match_id:matchId,home_score:home,away_score:away},{onConflict:'match_id'});
+  const{error}=await sb.rpc('admin_save_result',{p_pass:_adminPass(),p_mid:matchId,p_h:home,p_a:away});
   if(error)throw error;
 }
 async function dbGetResults(){
@@ -61,19 +63,31 @@ async function dbGetSettings(){
   if(error)throw error; return data||{phase:1,phase1_locked:false,phase2_locked:false};
 }
 async function dbSaveSettings(settings){
-  const{error}=await sb.from('settings').upsert({id:1,...settings},{onConflict:'id'});
+  const{error}=await sb.rpc('admin_save_settings',{
+    p_pass:_adminPass(),
+    p_phase:settings.phase||1,
+    p_l1:settings.phase1_locked||false,
+    p_l2:settings.phase2_locked||false
+  });
   if(error)throw error;
 }
 async function dbUpdatePoints(pid,pts,breakdown){
-  const{error}=await sb.from('participants').update({
-    total_points:pts,
-    breakdown:JSON.stringify(breakdown)
-  }).eq('id',pid);
+  const{error}=await sb.rpc('admin_update_points',{
+    p_pass:_adminPass(),p_id:pid,p_points:pts,p_breakdown:JSON.stringify(breakdown)
+  });
   if(error)throw error;
 }
 async function dbTogglePaid(pid,paid){
-  const{error}=await sb.from('participants').update({paid}).eq('id',pid);
+  const{error}=await sb.rpc('admin_toggle_paid',{p_pass:_adminPass(),p_id:pid,p_paid:paid});
   if(error)throw error;
+}
+async function dbAdminCheck(pass){
+  const{data,error}=await sb.rpc('admin_check',{p_pass:pass});
+  if(error)throw error; return data===true;
+}
+async function dbAdminListParticipants(){
+  const{data,error}=await sb.rpc('admin_list_participants',{p_pass:_adminPass()});
+  if(error)throw error; return data||[];
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -272,8 +286,8 @@ function calcAllPoints(participantPreds, realResults, realClassified) {
 }
 
 async function dbCreateParticipantWithPin(name, pin){
-  const{data,error}=await sb.from('participants').insert({name,pin,total_points:0,paid:false}).select().single();
-  if(error)throw error; return data;
+  const{data,error}=await sb.rpc('admin_create_participant',{p_pass:_adminPass(),p_name:name,p_pin:pin});
+  if(error)throw error; return (data&&data[0])||data;
 }
 
 // Update calcAllPoints to use new elim ID ranges
@@ -292,10 +306,3 @@ async function dbGetRealClassified(){
   return getQualified(grouped);
 }
 
-async function dbSaveRealClassified(classified){
-  const{error}=await sb.from('settings').upsert({
-    id:1,
-    real_classified: JSON.stringify(classified)
-  },{onConflict:'id'});
-  if(error)throw error;
-}

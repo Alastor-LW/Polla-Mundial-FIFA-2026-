@@ -90,19 +90,39 @@
 <script src="js/data.js?v=6aa4fd6"></script>
 <script src="js/db.js?v=6aa4fd6"></script>
 <script>
-const PASS='mundial2026admin';
 let allResults=[], currentPhase=1, settings={};
 
-function login(){
-  if(document.getElementById('adminPass').value===PASS){
+// La contraseña se valida en el SERVIDOR (tabla admin_config) y se
+// guarda en sessionStorage para firmar cada operación de admin.
+async function login(){
+  const pass=document.getElementById('adminPass').value;
+  document.getElementById('loginMsg').innerHTML='<div class="alert alert-info">Verificando...</div>';
+  try{
+    const ok=await dbAdminCheck(pass);
+    if(!ok){ document.getElementById('loginMsg').innerHTML='<div class="alert alert-error">Contraseña incorrecta</div>'; return; }
+    sessionStorage.setItem('polla_admin', pass);
     document.getElementById('loginCard').style.display='none';
     document.getElementById('adminPanel').style.display='block';
     initAdmin();
-  } else {
-    document.getElementById('loginMsg').innerHTML='<div class="alert alert-error">Contraseña incorrecta</div>';
+  }catch(e){
+    document.getElementById('loginMsg').innerHTML=`<div class="alert alert-error">Error: ${e.message}</div>`;
   }
 }
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('loginCard').style.display!=='none')login();});
+
+// Sesión de admin activa en esta pestaña → entra directo
+window.addEventListener('DOMContentLoaded', async () => {
+  const saved=sessionStorage.getItem('polla_admin');
+  if(saved){
+    try{
+      if(await dbAdminCheck(saved)){
+        document.getElementById('loginCard').style.display='none';
+        document.getElementById('adminPanel').style.display='block';
+        initAdmin();
+      } else sessionStorage.removeItem('polla_admin');
+    }catch(e){}
+  }
+});
 
 async function initAdmin(){
   await loadSettings();
@@ -465,7 +485,8 @@ async function loadResults(){
 }
 
 async function loadParticipants(){
-  const [parts, allPreds] = await Promise.all([dbGetParticipants(), dbGetAllPredictions()]);
+  // Lista vía función de admin: incluye los PINs (la lectura directa ya no los expone)
+  const [parts, allPreds] = await Promise.all([dbAdminListParticipants(), dbGetAllPredictions()]);
   const inPhase2 = (settings.phase || 1) === 2;
   const chip = (label, n, total) => {
     const color = n >= total ? 'var(--green)' : n > 0 ? 'var(--gold)' : 'var(--red)';
