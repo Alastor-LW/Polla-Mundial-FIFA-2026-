@@ -54,6 +54,10 @@ async function dbSaveResult(matchId,home,away){
   const{error}=await sb.rpc('admin_save_result',{p_pass:_adminPass(),p_mid:matchId,p_h:home,p_a:away});
   if(error)throw error;
 }
+async function dbDeleteResult(matchId){
+  const{error}=await sb.rpc('admin_delete_result',{p_pass:_adminPass(),p_mid:matchId});
+  if(error)throw error;
+}
 async function dbGetResults(){
   const{data,error}=await sb.from('results').select('*');
   if(error)throw error; return data||[];

@@ -313,32 +313,43 @@ async function saveRes(){
 
   try {
     await dbSaveResult(mid, h, a);
-    // Recalculate all participants
-    allResults = await dbGetResults();
-    const resultMap = {};
-    allResults.forEach(r => resultMap[r.match_id] = { h: r.home_score, a: r.away_score });
-
-    const [parts, allPreds] = await Promise.all([dbGetParticipants(), dbGetAllPredictions()]);
-
-    // Calculate real classified from actual results
-    // Solo cuando están los 72 resultados de grupos — igual que leaderboard.
-    // Con grupos a medias, la clasificación y la penalización -2 no aplican.
-    const groupResults = allResults.filter(r => r.match_id <= 72);
-    const realGroupScores = {};
-    groupResults.forEach(r => {
-      realGroupScores[r.match_id] = { home: r.home_score, away: r.away_score };
-    });
-    const realGrouped = calcStandings(realGroupScores);
-    const realClassified = groupResults.length >= 72 ? getQualified(realGrouped) : null;
-
-    for (const p of parts) {
-      const myPreds = allPreds.filter(x => x.participant_id === p.id);
-      const bd = calcAllPoints(myPreds, resultMap, realClassified);
-      await dbUpdatePoints(p.id, bd.total, bd);
-    }
-
+    await recalcAll();
     msg.innerHTML = '<div class="alert alert-success">✅ Resultado guardado · Puntos recalculados para todos</div>';
-    await Promise.all([loadStats(), loadResults(), loadParticipants()]);
+  } catch(e) {
+    msg.innerHTML = `<div class="alert alert-error">❌ ${e.message}</div>`;
+  }
+}
+
+// Recalcula los puntos de TODOS desde los resultados actuales y refresca el panel
+async function recalcAll(){
+  allResults = await dbGetResults();
+  const resultMap = {};
+  allResults.forEach(r => resultMap[r.match_id] = { h: r.home_score, a: r.away_score });
+
+  const [parts, allPreds] = await Promise.all([dbGetParticipants(), dbGetAllPredictions()]);
+
+  // realClassified solo con los 72 resultados de grupos (igual que leaderboard)
+  const groupResults = allResults.filter(r => r.match_id <= 72);
+  const realGroupScores = {};
+  groupResults.forEach(r => realGroupScores[r.match_id] = { home: r.home_score, away: r.away_score });
+  const realClassified = groupResults.length >= 72 ? getQualified(calcStandings(realGroupScores)) : null;
+
+  for (const p of parts) {
+    const bd = calcAllPoints(allPreds.filter(x => x.participant_id === p.id), resultMap, realClassified);
+    await dbUpdatePoints(p.id, bd.total, bd);
+  }
+  await Promise.all([loadStats(), loadResults(), loadParticipants()]);
+}
+
+// Borrar un resultado ya ingresado (p.ej. lo metieron por error o antes de jugarse)
+async function deleteResult(mid, label){
+  if (!confirm(`¿Borrar el resultado de ${label}?\n\nEl partido quedará SIN resultado y se recalcularán los puntos de todos.`)) return;
+  const msg = document.getElementById('resMsg');
+  msg.innerHTML = '<div class="alert alert-info">Borrando y recalculando...</div>';
+  try {
+    await dbDeleteResult(mid);
+    await recalcAll();
+    msg.innerHTML = '<div class="alert alert-success">🗑️ Resultado borrado · Puntos recalculados</div>';
   } catch(e) {
     msg.innerHTML = `<div class="alert alert-error">❌ ${e.message}</div>`;
   }
@@ -450,11 +461,12 @@ async function loadResults(){
     </div>`;
     matches.forEach(m => {
       const r = resultMap[m.id];
-      html += `<div style="display:grid;grid-template-columns:58px 1fr auto;gap:8px;padding:5px 0 5px 6px;border-bottom:1px solid var(--border);font-size:.83rem;align-items:center">
+      html += `<div style="display:grid;grid-template-columns:58px 1fr auto auto;gap:8px;padding:5px 0 5px 6px;border-bottom:1px solid var(--border);font-size:.83rem;align-items:center">
         <span class="text-gray" style="font-size:.72rem">${m.date}</span>
         <span style="${r?'':'color:var(--gray)'}">${m.home} vs ${m.away}</span>
-        ${r ? `<strong class="text-gold">${r.home_score} — ${r.away_score}</strong>`
-            : `<span style="color:var(--red);font-size:.74rem;font-weight:700">— Pendiente</span>`}
+        ${r ? `<strong class="text-gold">${r.home_score} — ${r.away_score}</strong>
+               <button onclick="deleteResult(${m.id},'${m.home} vs ${m.away}')" title="Borrar resultado" style="background:none;border:none;cursor:pointer;font-size:.9rem;padding:0 4px">🗑️</button>`
+            : `<span style="color:var(--red);font-size:.74rem;font-weight:700">— Pendiente</span><span></span>`}
       </div>`;
     });
   });
@@ -472,10 +484,11 @@ async function loadResults(){
                     m.id >= 129 ? '🔱 SF' :
                     m.id >= 125 ? '🔱 QF' :
                     m.id >= 117 ? '🔱 Octavos' : '🔱 R32';
-      html += `<div style="display:grid;grid-template-columns:80px 1fr auto;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:.83rem;align-items:center">
+      html += `<div style="display:grid;grid-template-columns:80px 1fr auto auto;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:.83rem;align-items:center">
         <span class="text-gray" style="font-size:.75rem">${label}</span>
         <span>${m.home} vs ${m.away}</span>
         <strong class="text-gold">${r.home_score} — ${r.away_score}</strong>
+        <button onclick="deleteResult(${m.id},'${m.home} vs ${m.away}')" title="Borrar resultado" style="background:none;border:none;cursor:pointer;font-size:.9rem;padding:0 4px">🗑️</button>
       </div>`;
     });
   }
