@@ -6,6 +6,25 @@ const SCORING={
   champion_f1:40, runner_f1:20, champion_f2:20, runner_f2:10
 };
 
+// Siglas de 3 letras por selección (para el desglose de puntos)
+const TEAM_ABBR={
+  "México":"MEX","Corea del Sur":"COR","Sudáfrica":"RSA","Rep. Checa":"CZE",
+  "Canadá":"CAN","Bosnia-Herz.":"BIH","Qatar":"QAT","Suiza":"SUI",
+  "Brasil":"BRA","Marruecos":"MAR","Haití":"HAI","Escocia":"SCO",
+  "EE.UU.":"USA","Paraguay":"PAR","Australia":"AUS","Turquía":"TUR",
+  "Alemania":"GER","C. de Marfil":"CIV","Ecuador":"ECU","Curazao":"CUW",
+  "Países Bajos":"NED","Suecia":"SWE","Túnez":"TUN","Japón":"JPN",
+  "Bélgica":"BEL","Egipto":"EGY","Irán":"IRN","Nueva Zelanda":"NZL",
+  "España":"ESP","Cabo Verde":"CPV","Arabia Saudí":"KSA","Uruguay":"URU",
+  "Francia":"FRA","Senegal":"SEN","Irak":"IRQ","Noruega":"NOR",
+  "Argentina":"ARG","Argelia":"ALG","Austria":"AUT","Jordania":"JOR",
+  "Portugal":"POR","DR Congo":"COD","Uzbekistán":"UZB","Colombia":"COL",
+  "Inglaterra":"ENG","Croacia":"CRO","Ghana":"GHA","Panamá":"PAN",
+};
+function abbr(team){ return TEAM_ABBR[team] || (team||'?').slice(0,3).toUpperCase(); }
+// Mapa rápido id de partido → datos (para mostrar el cruce en el desglose)
+const MATCH_BY_ID={};
+
 const GROUPS={
   A:["México","Corea del Sur","Sudáfrica","Rep. Checa"],
   B:["Canadá","Bosnia-Herz.","Qatar","Suiza"],
@@ -96,6 +115,7 @@ const GROUP_MATCHES=[
   {id:71,date:"Jun 27",time:"9 PM",group:"L",home:"Croacia",away:"Ghana",venue:"Filadelfia"},
   {id:72,date:"Jun 27",time:"9 PM",group:"L",home:"Panamá",away:"Inglaterra",venue:"E. Rutherford"},
 ];
+GROUP_MATCHES.forEach(m=>MATCH_BY_ID[m.id]=m);
 
 // ── ELIMINATORIAS: IDs 101-132 (no colisionan con grupos 1-72) ────────────
 // R32: 101-116, R16: 117-124, QF: 125-128, SF: 129-130, Final: 131, 3P: 132
