@@ -147,7 +147,9 @@ async function showBreakdown(pid,name){
   document.getElementById('modal').classList.add('open');
 
   try{
-    const preds=await dbGetPredictions(pid);
+    // Traer resultados FRESCOS para que el desglose nunca quede desactualizado
+    const [preds, freshResults]=await Promise.all([dbGetPredictions(pid), dbGetResults()]);
+    allResults=freshResults;
     const resultMap={};
     allResults.forEach(r=>resultMap[r.match_id]={h:r.home_score,a:r.away_score});
     // Calcular clasificados reales igual que en el admin
