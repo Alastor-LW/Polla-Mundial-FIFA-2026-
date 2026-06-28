@@ -224,46 +224,43 @@ function winner(id,home,away,scores){
   return h>a?home:away;
 }
 
+// Árbol oficial de cruces (fuente: FIFA/openfootball, verificado).
+// Cada cruce = [id, idGanadorLocal, idGanadorVisitante]. El orden de la lista
+// es el orden de arriba→abajo del bracket oficial (cruces hermanos juntos).
+const BRACKET_TREE={
+  r16:[
+    [118,101,103],[117,102,105],[119,104,106],[120,107,108],
+    [122,109,110],[121,111,112],[124,113,115],[123,114,116],
+  ],
+  qf:[[125,117,118],[127,119,120],[126,121,122],[128,123,124]],
+  sf:[[129,125,126],[130,127,128]],
+};
+
 function buildBracket(r32teams,elimScores){
   const r32=r32teams.map(m=>({
     id:m.id,home:m.home,away:m.away,label:m.label,
     winner:winner(m.id,m.home,m.away,elimScores),
     s:elimScores[m.id]||{}
   }));
-  // R16: IDs 117-124
-  const r16=[
-    {id:117,home:r32[0].winner||'?',away:r32[1].winner||'?'},
-    {id:118,home:r32[2].winner||'?',away:r32[3].winner||'?'},
-    {id:119,home:r32[4].winner||'?',away:r32[5].winner||'?'},
-    {id:120,home:r32[6].winner||'?',away:r32[7].winner||'?'},
-    {id:121,home:r32[8].winner||'?',away:r32[9].winner||'?'},
-    {id:122,home:r32[10].winner||'?',away:r32[11].winner||'?'},
-    {id:123,home:r32[12].winner||'?',away:r32[13].winner||'?'},
-    {id:124,home:r32[14].winner||'?',away:r32[15].winner||'?'},
-  ].map(m=>({...m,winner:winner(m.id,m.home,m.away,elimScores),s:elimScores[m.id]||{}}));
+  const W={}; r32.forEach(m=>W[m.id]=m.winner); // id → equipo ganador
 
-  // QF: IDs 125-128
-  const qf=[
-    {id:125,home:r16[0].winner||'?',away:r16[1].winner||'?'},
-    {id:126,home:r16[2].winner||'?',away:r16[3].winner||'?'},
-    {id:127,home:r16[4].winner||'?',away:r16[5].winner||'?'},
-    {id:128,home:r16[6].winner||'?',away:r16[7].winner||'?'},
-  ].map(m=>({...m,winner:winner(m.id,m.home,m.away,elimScores),s:elimScores[m.id]||{}}));
-
-  // SF: IDs 129-130
-  const sf=[
-    {id:129,home:qf[0].winner||'?',away:qf[1].winner||'?'},
-    {id:130,home:qf[2].winner||'?',away:qf[3].winner||'?'},
-  ].map(m=>{
-    const w=winner(m.id,m.home,m.away,elimScores);
-    return{...m,winner:w,loser:w?(w===m.home?m.away:m.home):null,s:elimScores[m.id]||{}};
+  const buildRound=tree=>tree.map(([id,hm,am])=>{
+    const m={id,home:W[hm]||'?',away:W[am]||'?'};
+    const w=winner(id,m.home,m.away,elimScores);
+    m.winner=w; m.loser=w?(w===m.home?m.away:m.home):null; m.s=elimScores[id]||{};
+    W[id]=w; return m;
   });
 
-  // Final: 131, 3P: 132
-  const fh=sf[0].winner||'?',fa=sf[1].winner||'?';
-  const final={id:131,home:fh,away:fa,winner:winner(131,fh,fa,elimScores),s:elimScores[131]||{}};
-  const th=sf[0].loser||'?',ta=sf[1].loser||'?';
-  const third={id:132,home:th,away:ta,winner:winner(132,th,ta,elimScores),s:elimScores[132]||{}};
+  const r16=buildRound(BRACKET_TREE.r16);
+  const qf =buildRound(BRACKET_TREE.qf);
+  const sf =buildRound(BRACKET_TREE.sf);
+
+  // Final: ganador SF129 vs ganador SF130 · 3er puesto: los dos perdedores de SF
+  const sfById=id=>sf.find(m=>m.id===id);
+  const final={id:131,home:W[129]||'?',away:W[130]||'?',s:elimScores[131]||{}};
+  final.winner=winner(131,final.home,final.away,elimScores);
+  const third={id:132,home:sfById(129).loser||'?',away:sfById(130).loser||'?',s:elimScores[132]||{}};
+  third.winner=winner(132,third.home,third.away,elimScores);
 
   return{r32,r16,qf,sf,final,third};
 }
