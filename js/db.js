@@ -222,24 +222,27 @@ function calcAllPoints(participantPreds, realResults, realClassified) {
       if (parseInt(id) >= 101) realElimScores[id] = realResults[id];
     });
 
-    // Bracket real: clasificados reales + resultados reales
-    const realBracket = buildBracket(buildR32(realClassified), realElimScores);
+    // F1 usa la estructura LEGACY (lo que cada compa llenó, congelado);
+    // F2 usa la estructura OFICIAL. Cada fase se compara contra el bracket
+    // real construido con SU MISMA estructura, para que el cotejo sea coherente.
+    const realBracketF1 = buildBracketLegacy(buildR32Legacy(realClassified), realElimScores);
+    const realBracketF2 = buildBracket(buildR32(realClassified), realElimScores);
     // Bracket F1 del participante: SUS clasificados predichos + sus marcadores F1
     const predScoresG = {};
     participantPreds.filter(p => p.match_id <= 72).forEach(p => {
       predScoresG[p.match_id] = { home: p.home_score, away: p.away_score };
     });
     const predQF1 = getQualified(calcStandings(predScoresG));
-    const predBracketF1 = buildBracket(buildR32(predQF1), elimScoresF1);
+    const predBracketF1 = buildBracketLegacy(buildR32Legacy(predQF1), elimScoresF1);
     // Bracket F2 del participante: clasificados REALES + sus marcadores F2
     const predBracketF2 = buildBracket(buildR32(realClassified), elimScoresF2);
 
     const flat = b => [...b.r32, ...b.r16, ...b.qf, ...b.sf, b.final, b.third];
-    const realMap = {};
-    flat(realBracket).forEach(m => realMap[m.id] = m);
     const roundName = id => id <= 116 ? 'R32' : id <= 124 ? 'Octavos' : id <= 128 ? 'Cuartos' : id <= 130 ? 'Semis' : id === 131 ? 'Final' : '3er puesto';
 
-    const scoreElim = (predBracket, isF2) => {
+    const scoreElim = (predBracket, realBracket, isF2) => {
+      const realMap = {};
+      flat(realBracket).forEach(m => realMap[m.id] = m);
       flat(predBracket).forEach(pm => {
         if (!pm.winner || pm.winner === '?' || pm.home === '?' || pm.away === '?') return; // sin predicción válida
         const rm = realMap[pm.id];
@@ -280,8 +283,8 @@ function calcAllPoints(participantPreds, realResults, realClassified) {
         }
       }
     };
-    scoreElim(predBracketF1, false);
-    scoreElim(predBracketF2, true);
+    scoreElim(predBracketF1, realBracketF1, false);
+    scoreElim(predBracketF2, realBracketF2, true);
   }
 
   breakdown.total = breakdown.pts_groups + breakdown.pts_classify +

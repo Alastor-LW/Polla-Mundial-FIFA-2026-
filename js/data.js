@@ -265,6 +265,64 @@ function buildBracket(r32teams,elimScores){
   return{r32,r16,qf,sf,final,third};
 }
 
+// ── LEGACY (Fase 1) ─────────────────────────────────────────────────────────
+// Estructura ORIGINAL con la que los compas llenaron su bracket F1 antes del
+// torneo (terceros por orden de ranking + árbol secuencial). Se conserva tal
+// cual para NO alterar retroactivamente lo que cada uno predijo. NO usar para
+// Fase 2 (esa va con la estructura oficial de arriba).
+function buildR32Legacy(q){
+  const f=q.firsts, s=q.seconds, t=q.thirds.map(x=>x.team);
+  return [
+    {id:101, home:s.A, away:s.B,        label:'2°A vs 2°B'},
+    {id:102, home:f.E, away:t[0]||'3°', label:'1°E vs 3°'},
+    {id:103, home:f.F, away:s.C,        label:'1°F vs 2°C'},
+    {id:104, home:f.C, away:s.F,        label:'1°C vs 2°F'},
+    {id:105, home:f.I, away:t[1]||'3°', label:'1°I vs 3°'},
+    {id:106, home:s.E, away:s.I,        label:'2°E vs 2°I'},
+    {id:107, home:f.A, away:t[2]||'3°', label:'1°A vs 3°'},
+    {id:108, home:f.L, away:t[3]||'3°', label:'1°L vs 3°'},
+    {id:109, home:f.D, away:t[4]||'3°', label:'1°D vs 3°'},
+    {id:110, home:f.G, away:t[5]||'3°', label:'1°G vs 3°'},
+    {id:111, home:s.K, away:s.L,        label:'2°K vs 2°L'},
+    {id:112, home:f.H, away:s.J,        label:'1°H vs 2°J'},
+    {id:113, home:f.B, away:t[6]||'3°', label:'1°B vs 3°'},
+    {id:114, home:f.J, away:s.H,        label:'1°J vs 2°H'},
+    {id:115, home:f.K, away:t[7]||'3°', label:'1°K vs 3°'},
+    {id:116, home:s.D, away:s.G,        label:'2°D vs 2°G'},
+  ];
+}
+function buildBracketLegacy(r32teams,elimScores){
+  const r32=r32teams.map(m=>({
+    id:m.id,home:m.home,away:m.away,label:m.label,
+    winner:winner(m.id,m.home,m.away,elimScores),s:elimScores[m.id]||{}
+  }));
+  const r16=[
+    {id:117,home:r32[0].winner||'?',away:r32[1].winner||'?'},
+    {id:118,home:r32[2].winner||'?',away:r32[3].winner||'?'},
+    {id:119,home:r32[4].winner||'?',away:r32[5].winner||'?'},
+    {id:120,home:r32[6].winner||'?',away:r32[7].winner||'?'},
+    {id:121,home:r32[8].winner||'?',away:r32[9].winner||'?'},
+    {id:122,home:r32[10].winner||'?',away:r32[11].winner||'?'},
+    {id:123,home:r32[12].winner||'?',away:r32[13].winner||'?'},
+    {id:124,home:r32[14].winner||'?',away:r32[15].winner||'?'},
+  ].map(m=>({...m,winner:winner(m.id,m.home,m.away,elimScores),s:elimScores[m.id]||{}}));
+  const qf=[
+    {id:125,home:r16[0].winner||'?',away:r16[1].winner||'?'},
+    {id:126,home:r16[2].winner||'?',away:r16[3].winner||'?'},
+    {id:127,home:r16[4].winner||'?',away:r16[5].winner||'?'},
+    {id:128,home:r16[6].winner||'?',away:r16[7].winner||'?'},
+  ].map(m=>({...m,winner:winner(m.id,m.home,m.away,elimScores),s:elimScores[m.id]||{}}));
+  const sf=[
+    {id:129,home:qf[0].winner||'?',away:qf[1].winner||'?'},
+    {id:130,home:qf[2].winner||'?',away:qf[3].winner||'?'},
+  ].map(m=>{const w=winner(m.id,m.home,m.away,elimScores);return{...m,winner:w,loser:w?(w===m.home?m.away:m.home):null,s:elimScores[m.id]||{}};});
+  const fh=sf[0].winner||'?',fa=sf[1].winner||'?';
+  const final={id:131,home:fh,away:fa,winner:winner(131,fh,fa,elimScores),s:elimScores[131]||{}};
+  const th=sf[0].loser||'?',ta=sf[1].loser||'?';
+  const third={id:132,home:th,away:ta,winner:winner(132,th,ta,elimScores),s:elimScores[132]||{}};
+  return{r32,r16,qf,sf,final,third};
+}
+
 // All elim IDs — NO overlap with group IDs 1-72
 const ELIM_IDS=[
   101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116, // R32

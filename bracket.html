@@ -200,7 +200,7 @@ async function renderQualified() {
   // F1: predicted classified
   const grouped = calcStandings(myScores);
   const qF1 = getQualified(grouped);
-  r32teamsF1 = buildR32(qF1);
+  r32teamsF1 = buildR32Legacy(qF1); // F1 conserva la estructura original (congelada)
 
   let html = '<div class="qualified-grid">';
   Object.keys(GROUPS).forEach(grp => {
@@ -277,8 +277,8 @@ function mBoxReadonly(m, realMap) {
   </div>`;
 }
 
-function drawBracketReadonly(containerId, r32teams, scores, realMap, champLabel, realChamp) {
-  const bracket = buildBracket(r32teams, scores);
+function drawBracketReadonly(containerId, r32teams, scores, realMap, champLabel, realChamp, buildFn) {
+  const bracket = (buildFn||buildBracket)(r32teams, scores);
   const rounds = [
     {label:'Ronda de 32<br><small>28 Jun–2 Jul</small>', matches:bracket.r32},
     {label:'Octavos<br><small>6–9 Jul</small>',          matches:bracket.r16},
@@ -340,11 +340,11 @@ async function renderBracketF1() {
       const realQ = await dbGetRealClassified();
       const realElim = {};
       realResults.filter(r => r.match_id >= 101).forEach(r => realElim[r.match_id] = { h: r.home_score, a: r.away_score });
-      const rc = buildBracket(buildR32(realQ), realElim).final.winner;
+      const rc = buildBracketLegacy(buildR32Legacy(realQ), realElim).final.winner;
       if (rc && rc !== '?') realChamp = rc;
     } catch(e) {}
 
-    drawBracketReadonly('bracketF1Container', r32teamsF1, myElimScoresF1, realMap, 'Tu campeón F1', realChamp);
+    drawBracketReadonly('bracketF1Container', r32teamsF1, myElimScoresF1, realMap, 'Tu campeón F1', realChamp, buildBracketLegacy);
 
   } else {
     // EDITABLE MODE: phase 1 open
@@ -381,7 +381,7 @@ async function resetBracket(ph) {
 }
 
 function drawBracketF1() {
-  const bracket = buildBracket(r32teamsF1, myElimScoresF1);
+  const bracket = buildBracketLegacy(r32teamsF1, myElimScoresF1);
   const rounds = [
     {label:'Ronda de 32<br><small>28 Jun–2 Jul</small>', matches:bracket.r32},
     {label:'Octavos<br><small>6–9 Jul</small>',          matches:bracket.r16},
