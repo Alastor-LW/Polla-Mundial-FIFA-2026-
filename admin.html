@@ -242,12 +242,13 @@ async function populateMatchSelect(){
       return `Partido #${id}`;
     }
 
+    // En el ORDEN del bracket oficial (como se juegan), igual que el F2
     const elimGroups = [
-      { label:'RONDA DE 32 (28 Jun–2 Jul)', ids: ELIM_IDS.slice(0,16) },
-      { label:'OCTAVOS DE FINAL (6–9 Jul)', ids: ELIM_IDS.slice(16,24) },
-      { label:'CUARTOS DE FINAL (11–12 Jul)', ids: ELIM_IDS.slice(24,28) },
-      { label:'SEMIFINALES (15–16 Jul)', ids: ELIM_IDS.slice(28,30) },
-      { label:'FINAL & 3er PUESTO', ids: ELIM_IDS.slice(30,32) },
+      { label:'RONDA DE 32 (28 Jun–2 Jul)', ids: R32_DISPLAY },
+      { label:'OCTAVOS DE FINAL (6–9 Jul)', ids: BRACKET_TREE.r16.map(t => t[0]) },
+      { label:'CUARTOS DE FINAL (11–12 Jul)', ids: BRACKET_TREE.qf.map(t => t[0]) },
+      { label:'SEMIFINALES (15–16 Jul)', ids: BRACKET_TREE.sf.map(t => t[0]) },
+      { label:'FINAL & 3er PUESTO', ids: [131, 132] },
     ];
     // Equipos conocidos por partido (para deshabilitar rondas aún no definidas)
     function getMatchTeams(id) {
