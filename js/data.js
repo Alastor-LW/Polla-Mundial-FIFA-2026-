@@ -229,20 +229,25 @@ function winner(id,home,away,scores){
 // es el orden de arriba→abajo del bracket oficial (cruces hermanos juntos).
 const BRACKET_TREE={
   r16:[
-    [118,101,103],[117,102,105],[119,104,106],[120,107,108],
-    [122,109,110],[121,111,112],[124,113,115],[123,114,116],
+    [118,101,103],[117,102,105],[122,109,110],[121,111,112],
+    [119,104,106],[120,107,108],[124,113,115],[123,114,116],
   ],
-  qf:[[125,117,118],[127,119,120],[126,121,122],[128,123,124]],
+  qf:[[125,117,118],[126,121,122],[127,119,120],[128,123,124]],
   sf:[[129,125,126],[130,127,128]],
 };
+// Orden visual de la R32 de arriba→abajo del bracket oficial (cruces que se
+// enfrentan en octavos quedan juntos). Solo afecta la presentación del F2.
+const R32_DISPLAY=[101,103,102,105,110,109,112,111,104,106,107,108,113,115,116,114];
 
 function buildBracket(r32teams,elimScores){
-  const r32=r32teams.map(m=>({
+  const r32raw=r32teams.map(m=>({
     id:m.id,home:m.home,away:m.away,label:m.label,
     winner:winner(m.id,m.home,m.away,elimScores),
     s:elimScores[m.id]||{}
   }));
-  const W={}; r32.forEach(m=>W[m.id]=m.winner); // id → equipo ganador
+  const W={}; r32raw.forEach(m=>W[m.id]=m.winner); // id → equipo ganador
+  const _byId={}; r32raw.forEach(m=>_byId[m.id]=m);
+  const r32=R32_DISPLAY.map(id=>_byId[id]).filter(Boolean); // reordenado para la vista
 
   const buildRound=tree=>tree.map(([id,hm,am])=>{
     const m={id,home:W[hm]||'?',away:W[am]||'?'};
