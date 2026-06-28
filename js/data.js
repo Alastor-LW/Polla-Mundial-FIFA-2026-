@@ -1,7 +1,9 @@
 const SCORING={
   group_exact:3, group_winner:1,
   group_both_order:10, group_both_swap:6, group_one:3,
-  elim1_winner:5, elim1_exact:8, elim1_miss:-1,
+  // Fase 1: por RONDA ALCANZADA (equipos que predijiste que llegaban y llegaron)
+  elim1_r16:2, elim1_qf:3, elim1_sf:5, elim1_final:8, elim1_reach_miss:-1,
+  // Fase 2: resultado EXACTO por partido (cruces oficiales correctos)
   elim2_winner:3, elim2_exact:5, elim2_miss:0,
   champion_f1:40, runner_f1:20, champion_f2:20, runner_f2:10
 };

@@ -222,12 +222,9 @@ function calcAllPoints(participantPreds, realResults, realClassified) {
       if (parseInt(id) >= 101) realElimScores[id] = realResults[id];
     });
 
-    // F1 usa la estructura LEGACY (lo que cada compa llenó, congelado);
-    // F2 usa la estructura OFICIAL. Cada fase se compara contra el bracket
-    // real construido con SU MISMA estructura, para que el cotejo sea coherente.
-    const realBracketF1 = buildBracketLegacy(buildR32Legacy(realClassified), realElimScores);
+    // Bracket real OFICIAL (la verdad del torneo) — referencia para ambas fases.
     const realBracketF2 = buildBracket(buildR32(realClassified), realElimScores);
-    // Bracket F1 del participante: SUS clasificados predichos + sus marcadores F1
+    // Bracket F1 del participante (estructura LEGACY congelada + sus marcadores F1)
     const predScoresG = {};
     participantPreds.filter(p => p.match_id <= 72).forEach(p => {
       predScoresG[p.match_id] = { home: p.home_score, away: p.away_score };
@@ -239,6 +236,48 @@ function calcAllPoints(participantPreds, realResults, realClassified) {
 
     const flat = b => [...b.r32, ...b.r16, ...b.qf, ...b.sf, b.final, b.third];
     const roundName = id => id <= 116 ? 'R32' : id <= 124 ? 'Octavos' : id <= 128 ? 'Cuartos' : id <= 130 ? 'Semis' : id === 131 ? 'Final' : '3er puesto';
+
+    // ── FASE 1: puntaje por RONDA ALCANZADA ──────────────────────────────────
+    // No por resultado exacto (los cruces F1 ya no calzan con la realidad), sino
+    // por cuántos de los equipos que predijiste llegando a cada ronda realmente
+    // llegaron — sin importar el camino. Se compara contra el bracket REAL oficial.
+    const teamsOf = matches => {
+      const s = new Set();
+      matches.forEach(m => { if (m.home && m.home !== '?') s.add(m.home); if (m.away && m.away !== '?') s.add(m.away); });
+      return s;
+    };
+    const roundReady = matches => matches.length > 0 && matches.every(m => m.home && m.home !== '?' && m.away && m.away !== '?');
+
+    const scoreF1Rounds = (predB, realB) => {
+      const rounds = [
+        { name:'Octavos', pts:SCORING.elim1_r16,   predM:predB.r16,     realM:realB.r16 },
+        { name:'Cuartos', pts:SCORING.elim1_qf,    predM:predB.qf,      realM:realB.qf },
+        { name:'Semis',   pts:SCORING.elim1_sf,    predM:predB.sf,      realM:realB.sf },
+        { name:'Final',   pts:SCORING.elim1_final, predM:[predB.final], realM:[realB.final] },
+      ];
+      rounds.forEach(r => {
+        if (!roundReady(r.realM)) return; // la ronda real aún no se define
+        const real = teamsOf(r.realM), pred = teamsOf(r.predM);
+        pred.forEach(team => {
+          const ok = real.has(team);
+          const pts = ok ? r.pts : SCORING.elim1_reach_miss;
+          breakdown.elim_f1.push({ round:r.name, team, ok, pts });
+          breakdown.pts_elim_f1 += pts;
+        });
+      });
+      // Bono campeón / subcampeón (su campeón predicho vs el real)
+      const predChamp = predB.final.winner, realChamp = realB.final.winner;
+      if (predChamp && predChamp !== '?' && realChamp && realChamp !== '?') {
+        const realRunner = realChamp === realB.final.home ? realB.final.away : realB.final.home;
+        if (predChamp === realChamp) {
+          breakdown.champion.push({ pts: SCORING.champion_f1, label: `🏆 Campeón F1: ${predChamp}` });
+          breakdown.pts_champion += SCORING.champion_f1;
+        } else if (predChamp === realRunner) {
+          breakdown.champion.push({ pts: SCORING.runner_f1, label: `🥈 Subcampeón F1: ${predChamp} llegó a la final` });
+          breakdown.pts_champion += SCORING.runner_f1;
+        }
+      }
+    };
 
     const scoreElim = (predBracket, realBracket, isF2) => {
       const realMap = {};
@@ -283,8 +322,8 @@ function calcAllPoints(participantPreds, realResults, realClassified) {
         }
       }
     };
-    scoreElim(predBracketF1, realBracketF1, false);
-    scoreElim(predBracketF2, realBracketF2, true);
+    scoreF1Rounds(predBracketF1, realBracketF2); // F1: por ronda alcanzada
+    scoreElim(predBracketF2, realBracketF2, true); // F2: resultado exacto
   }
 
   breakdown.total = breakdown.pts_groups + breakdown.pts_classify +
