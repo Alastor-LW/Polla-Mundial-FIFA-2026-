@@ -227,21 +227,18 @@ async function populateMatchSelect(){
           return `${found.home} vs ${found.away}`;
         }
       }
-      // Fallback to R32 names from real classified
+      // Fallback con el ÁRBOL OFICIAL (mismo que el F2)
       const r32m = r32.find(m => m.id === id);
       if (r32m) return `${r32m.home} vs ${r32m.away}`;
-      const r16map = {
-        117: [r32[0], r32[1]], 118: [r32[2], r32[3]],
-        119: [r32[4], r32[5]], 120: [r32[6], r32[7]],
-        121: [r32[8], r32[9]], 122: [r32[10], r32[11]],
-        123: [r32[12], r32[13]], 124: [r32[14], r32[15]],
-      };
-      if (r16map[id]) {
-        const a = r16map[id][0], b = r16map[id][1];
-        return `G.${a.home||'?'} vs G.${b.home||'?'}`;
+      const FEED = {};
+      [...BRACKET_TREE.r16, ...BRACKET_TREE.qf, ...BRACKET_TREE.sf].forEach(t => FEED[t[0]] = [t[1], t[2]]);
+      if (id === 131) return 'Ganador SF1 vs Ganador SF2';
+      if (id === 132) return '3er puesto (perdedores de semis)';
+      if (FEED[id]) {
+        const a = r32.find(x => x.id === FEED[id][0]), b = r32.find(x => x.id === FEED[id][1]);
+        if (a && b) return `Gana(${a.home}) vs Gana(${b.home})`; // octavos: muestra los locales de R32
+        return `Ganador #${FEED[id][0]} vs Ganador #${FEED[id][1]}`;
       }
-      if (id === 131) return 'FINAL';
-      if (id === 132) return '3er PUESTO';
       return `Partido #${id}`;
     }
 
@@ -380,67 +377,17 @@ async function loadResults(){
   });
   const realGrouped = calcStandings(realGroupScores);
   const realQ = getQualified(realGrouped);
-  const r32teams = buildR32(realQ);
 
-  // Build elim scores map for winner calculation
+  // Bracket OFICIAL: misma función que usa el F2 (árbol y terceros correctos).
   const elimScores = {};
-  elimResults.forEach(r => {
-    elimScores[r.match_id] = { h: r.home_score, a: r.away_score };
-  });
+  elimResults.forEach(r => { elimScores[r.match_id] = { h: r.home_score, a: r.away_score }; });
+  const bracket = buildBracket(buildR32(realQ), elimScores);
 
-  // Winner function
-  function getWin(id, home, away) {
-    const s = elimScores[id];
-    if (!s) return null;
-    const h = parseInt(s.h), a = parseInt(s.a);
-    if (isNaN(h)||isNaN(a)) return null;
-    if (h === a) return null; // sin empates en eliminatorias
-    return h > a ? home : away;
-  }
-
-  // Build R32 results
-  const r32Results = r32teams.map(m => ({
-    id: m.id, home: m.home, away: m.away,
-    winner: getWin(m.id, m.home, m.away)
-  }));
-
-  // Build R16
-  const r16teams = [
-    {id:117, home:r32Results[0]?.winner||'?', away:r32Results[1]?.winner||'?'},
-    {id:118, home:r32Results[2]?.winner||'?', away:r32Results[3]?.winner||'?'},
-    {id:119, home:r32Results[4]?.winner||'?', away:r32Results[5]?.winner||'?'},
-    {id:120, home:r32Results[6]?.winner||'?', away:r32Results[7]?.winner||'?'},
-    {id:121, home:r32Results[8]?.winner||'?', away:r32Results[9]?.winner||'?'},
-    {id:122, home:r32Results[10]?.winner||'?', away:r32Results[11]?.winner||'?'},
-    {id:123, home:r32Results[12]?.winner||'?', away:r32Results[13]?.winner||'?'},
-    {id:124, home:r32Results[14]?.winner||'?', away:r32Results[15]?.winner||'?'},
-  ].map(m => ({...m, winner: getWin(m.id, m.home, m.away)}));
-
-  // Build QF
-  const qfteams = [
-    {id:125, home:r16teams[0]?.winner||'?', away:r16teams[1]?.winner||'?'},
-    {id:126, home:r16teams[2]?.winner||'?', away:r16teams[3]?.winner||'?'},
-    {id:127, home:r16teams[4]?.winner||'?', away:r16teams[5]?.winner||'?'},
-    {id:128, home:r16teams[6]?.winner||'?', away:r16teams[7]?.winner||'?'},
-  ].map(m => ({...m, winner: getWin(m.id, m.home, m.away)}));
-
-  // Build SF
-  const sfteams = [
-    {id:129, home:qfteams[0]?.winner||'?', away:qfteams[1]?.winner||'?'},
-    {id:130, home:qfteams[2]?.winner||'?', away:qfteams[3]?.winner||'?'},
-  ].map(m => {
-    const w = getWin(m.id, m.home, m.away);
-    return {...m, winner: w, loser: w?(w===m.home?m.away:m.home):null};
-  });
-
-  // Final & 3P
-  const finalMatch = {id:131, home:sfteams[0]?.winner||'?', away:sfteams[1]?.winner||'?'};
-  finalMatch.winner = getWin(131, finalMatch.home, finalMatch.away);
-  const thirdMatch = {id:132, home:sfteams[0]?.loser||'?', away:sfteams[1]?.loser||'?'};
-  thirdMatch.winner = getWin(132, thirdMatch.home, thirdMatch.away);
-
-  // Store for selector update
-  window._elimTeams = {r32:r32Results, r16:r16teams, qf:qfteams, sf:sfteams, final:finalMatch, third:thirdMatch};
+  // Guardar para el selector y los nombres reales conforme avanzan las rondas
+  window._elimTeams = {
+    r32: bracket.r32, r16: bracket.r16, qf: bracket.qf, sf: bracket.sf,
+    final: bracket.final, third: bracket.third
+  };
 
   // Refresh selector with real names
   await populateMatchSelect();
@@ -475,7 +422,7 @@ async function loadResults(){
   if (elimResults.length > 0) {
     html += `<div style="color:var(--gold);font-size:.82rem;font-weight:700;padding:12px 0 4px">🔱 ELIMINATORIAS (${elimResults.length})</div>`;
     const allElimTeams = [
-      ...r32Results, ...r16teams, ...qfteams, ...sfteams, finalMatch, thirdMatch
+      ...bracket.r32, ...bracket.r16, ...bracket.qf, ...bracket.sf, bracket.final, bracket.third
     ];
     allElimTeams.forEach(m => {
       const r = resultMap[m.id];
