@@ -249,35 +249,50 @@ async function renderQualified() {
 // ── RENDER SOLO-LECTURA (compartido F1/F2) ─────────────────────────────────
 // Muestra la predicción del participante vs el resultado real:
 // verde = su ganador acertó, rojo = falló, (real h-a) junto al marcador.
-function mBoxReadonly(m, realMap) {
+function mBoxReadonly(m, realMap, mode) {
   const hv = m.s?.h !== undefined && m.s?.h !== '' ? m.s.h : '';
   const av = m.s?.a !== undefined && m.s?.a !== '' ? m.s.a : '';
-  const real = realMap[m.id];
-  let hStyle='', aStyle='';
-  if (real && hv !== '') {
-    const predWin = parseInt(hv) >= parseInt(av) ? 'home' : 'away';
-    const realWin = real.h >= real.a ? 'home' : 'away';
-    hStyle = predWin==='home' ? (realWin==='home' ? 'background:#0d2e1a' : 'background:#2e0d0d') : '';
-    aStyle = predWin==='away' ? (realWin==='away' ? 'background:#0d2e1a' : 'background:#2e0d0d') : '';
-  }
-  // Marcador real por equipo, junto a la predicción: "tu gol (real gol)"
-  const realH = real ? `<span style="font-size:.7rem;color:var(--gray);margin-left:4px">(real ${real.h})</span>` : '';
-  const realA = real ? `<span style="font-size:.7rem;color:var(--gray);margin-left:4px">(real ${real.a})</span>` : '';
   const slot = m.label ? `<div style="font-size:.62rem;color:var(--gray);text-align:center;padding:3px 0 1px;letter-spacing:.5px">${m.label}</div>` : '';
-  return `<div class="bracket-match">
-    ${slot}
-    <div class="bracket-team" style="font-size:.8rem;${hStyle}">
-      <span style="flex:1">${m.home||'?'}</span>
-      <span class="bracket-score">${hv}${realH}</span>
-    </div>
-    <div class="bracket-team" style="font-size:.8rem;${aStyle}">
-      <span style="flex:1">${m.away||'?'}</span>
-      <span class="bracket-score">${av}${realA}</span>
-    </div>
+
+  // Fase 1: solo tu predicción (se puntúa por rondas alcanzadas, no por marcador)
+  if (mode === 'f1' || !realMap) {
+    return `<div class="bracket-match">${slot}
+      <div class="bracket-team" style="font-size:.8rem"><span style="flex:1">${m.home||'?'}</span><span class="bracket-score">${hv}</span></div>
+      <div class="bracket-team" style="font-size:.8rem"><span style="flex:1">${m.away||'?'}</span><span class="bracket-score">${av}</span></div>
+    </div>`;
+  }
+
+  // Fase 2: comparación con el partido REAL en este lugar del bracket
+  const real = realMap[m.id]; // {home, away, h, a}
+  const hasReal = real && real.h !== undefined && real.h !== null && real.home && real.home !== '?';
+  if (!hasReal) {
+    return `<div class="bracket-match">${slot}
+      <div class="bracket-team" style="font-size:.8rem"><span style="flex:1">${m.home||'?'}</span><span class="bracket-score">${hv}</span></div>
+      <div class="bracket-team" style="font-size:.8rem"><span style="flex:1">${m.away||'?'}</span><span class="bracket-score">${av}</span></div>
+    </div>`;
+  }
+  const sameMatch = (m.home===real.home && m.away===real.away) || (m.home===real.away && m.away===real.home);
+  if (!sameMatch) {
+    // Tu cruce no es el que se jugó aquí → 0 puntos; mostramos el partido real
+    return `<div class="bracket-match" style="border-color:var(--red)">${slot}
+      <div class="bracket-team" style="font-size:.8rem;background:#2e0d0d"><span style="flex:1;text-decoration:line-through;opacity:.65">${m.home||'?'}</span><span class="bracket-score">${hv}</span></div>
+      <div class="bracket-team" style="font-size:.8rem;background:#2e0d0d"><span style="flex:1;text-decoration:line-through;opacity:.65">${m.away||'?'}</span><span class="bracket-score">${av}</span></div>
+      <div style="font-size:.64rem;color:var(--red);text-align:center;padding:3px 4px;line-height:1.3">⚠️ Aquí jugó:<br><strong>${real.home} ${real.h}-${real.a} ${real.away}</strong></div>
+    </div>`;
+  }
+  // Cruce correcto: coloreo según tu ganador y muestro el gol real por equipo
+  const goalsFor = team => real.home===team ? real.h : real.a;
+  const predWinner = parseInt(hv) >= parseInt(av) ? m.home : m.away;
+  const realWinner = real.h > real.a ? real.home : real.away;
+  const winStyle = t => t===predWinner ? (predWinner===realWinner ? 'background:#0d2e1a' : 'background:#2e0d0d') : '';
+  const realTag = t => `<span style="font-size:.7rem;color:var(--gray);margin-left:4px">(real ${goalsFor(t)})</span>`;
+  return `<div class="bracket-match">${slot}
+    <div class="bracket-team" style="font-size:.8rem;${winStyle(m.home)}"><span style="flex:1">${m.home}</span><span class="bracket-score">${hv}${realTag(m.home)}</span></div>
+    <div class="bracket-team" style="font-size:.8rem;${winStyle(m.away)}"><span style="flex:1">${m.away}</span><span class="bracket-score">${av}${realTag(m.away)}</span></div>
   </div>`;
 }
 
-function drawBracketReadonly(containerId, r32teams, scores, realMap, champLabel, realChamp, buildFn) {
+function drawBracketReadonly(containerId, r32teams, scores, realMap, champLabel, realChamp, buildFn, mode) {
   const bracket = (buildFn||buildBracket)(r32teams, scores);
   const rounds = [
     {label:'Ronda de 32<br><small>28 Jun–2 Jul</small>', matches:bracket.r32},
@@ -288,16 +303,16 @@ function drawBracketReadonly(containerId, r32teams, scores, realMap, champLabel,
   let html = '';
   rounds.forEach(r => {
     html += `<div class="bracket-round"><h3>${r.label}</h3><div class="bracket-matches">`;
-    r.matches.forEach(m => html += mBoxReadonly(m, realMap));
+    r.matches.forEach(m => html += mBoxReadonly(m, realMap, mode));
     html += '</div></div>';
   });
   const champ = bracket.final.winner;
   html += `<div class="bracket-round"><h3>Final & 3er<br><small>18–19 Jul</small></h3>
     <div class="bracket-matches">
       <div style="font-size:.72rem;color:var(--gold);text-align:center;padding:4px 0">🏆 FINAL</div>
-      ${mBoxReadonly(bracket.final, realMap)}
+      ${mBoxReadonly(bracket.final, realMap, mode)}
       <div style="font-size:.72rem;color:var(--gray);text-align:center;padding:8px 0 4px">🥉 3er PUESTO</div>
-      ${mBoxReadonly(bracket.third, realMap)}
+      ${mBoxReadonly(bracket.third, realMap, mode)}
       <div style="margin-top:14px;text-align:center;padding:14px;
         background:${champ?'#1a1000':'var(--bg2)'};border-radius:10px;
         border:2px solid ${champ?'var(--gold)':'var(--border)'}">
@@ -323,28 +338,15 @@ async function renderBracketF1() {
   const saveBtn = document.getElementById('saveBracketF1Btn');
 
   if (isPhase2 || locked) {
-    // READONLY MODE: show F1 predictions vs real results
+    // READONLY: muestra tu bracket F1 tal como lo llenaste. NO compara marcadores
+    // porque la Fase 1 se puntúa por RONDAS ALCANZADAS (mira el detalle en la Tabla).
     msg.className = 'alert alert-info';
-    msg.textContent = '📋 Tu predicción Fase 1 — Solo lectura. Verde = acertaste, Rojo = fallaste. El marcador real va entre paréntesis.';
+    msg.innerHTML = '📋 Tu predicción Fase 1 — Solo lectura. La Fase 1 se puntúa por <strong>equipos que predijiste que llegaban a cada ronda y de verdad llegaron</strong> (ver el desglose en la Tabla 🏆).';
     hint.style.display = 'none';
     saveBtn.style.display = 'none';
     document.getElementById('resetBracketF1Btn').style.display = 'none';
 
-    const realResults = await dbGetResults();
-    const realMap = {};
-    realResults.forEach(r => realMap[r.match_id] = { h: r.home_score, a: r.away_score });
-
-    // Campeón real: bracket con clasificados reales + resultados reales
-    let realChamp = null;
-    try {
-      const realQ = await dbGetRealClassified();
-      const realElim = {};
-      realResults.filter(r => r.match_id >= 101).forEach(r => realElim[r.match_id] = { h: r.home_score, a: r.away_score });
-      const rc = buildBracketLegacy(buildR32Legacy(realQ), realElim).final.winner;
-      if (rc && rc !== '?') realChamp = rc;
-    } catch(e) {}
-
-    drawBracketReadonly('bracketF1Container', r32teamsF1, myElimScoresF1, realMap, 'Tu campeón F1', realChamp, buildBracketLegacy);
+    drawBracketReadonly('bracketF1Container', r32teamsF1, myElimScoresF1, null, 'Tu campeón F1', null, buildBracketLegacy, 'f1');
 
   } else {
     // EDITABLE MODE: phase 1 open
@@ -484,24 +486,26 @@ async function renderBracketF2() {
   }
 
   if (locked) {
-    // READONLY MODE: predicción F2 vs resultados reales, igual que F1
+    // READONLY: predicción F2 vs el bracket REAL. Si tu cruce no coincide con el
+    // real (predijiste mal una ronda previa), ese partido sale en rojo con el real.
     msg.className = 'alert alert-info';
-    msg.textContent = '📋 Tu predicción Fase 2 — Solo lectura. Verde = acertaste, Rojo = fallaste. El marcador real va entre paréntesis.';
+    msg.innerHTML = '📋 Tu predicción Fase 2 — Solo lectura. Verde = acertaste el ganador, Rojo = fallaste o el cruce real fue otro. El marcador real va entre paréntesis.';
     document.getElementById('bracketF2Hint').style.display = 'none';
     document.getElementById('saveBracketBtn').style.display = 'none';
     document.getElementById('resetBracketF2Btn').style.display = 'none';
 
     const realResults = await dbGetResults();
-    const realMap = {};
-    realResults.forEach(r => realMap[r.match_id] = { h: r.home_score, a: r.away_score });
-
-    // Campeón real: r32teamsReal ya son los clasificados reales
     const realElim = {};
     realResults.filter(r => r.match_id >= 101).forEach(r => realElim[r.match_id] = { h: r.home_score, a: r.away_score });
-    const rc = buildBracket(r32teamsReal, realElim).final.winner;
+    // Bracket REAL completo → mapa por partido con equipos y marcador real
+    const realBracket = buildBracket(r32teamsReal, realElim);
+    const realMap = {};
+    [...realBracket.r32, ...realBracket.r16, ...realBracket.qf, ...realBracket.sf, realBracket.final, realBracket.third]
+      .forEach(m => realMap[m.id] = { home: m.home, away: m.away, h: m.s?.h, a: m.s?.a });
+    const rc = realBracket.final.winner;
     const realChamp = rc && rc !== '?' ? rc : null;
 
-    drawBracketReadonly('bracketF2Container', r32teamsReal, myElimScoresF2, realMap, 'Tu campeón F2', realChamp);
+    drawBracketReadonly('bracketF2Container', r32teamsReal, myElimScoresF2, realMap, 'Tu campeón F2', realChamp, buildBracket, 'f2');
     return;
   }
 

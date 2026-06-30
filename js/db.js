@@ -283,20 +283,29 @@ function calcAllPoints(participantPreds, realResults, realClassified) {
       const realMap = {};
       flat(realBracket).forEach(m => realMap[m.id] = m);
       flat(predBracket).forEach(pm => {
-        if (!pm.winner || pm.winner === '?' || pm.home === '?' || pm.away === '?') return; // sin predicción válida
+        if (!pm.home || pm.home === '?' || !pm.away || pm.away === '?') return; // tu cruce sin definir
         const rm = realMap[pm.id];
         if (!rm || !rm.winner || rm.winner === '?') return; // sin resultado real aún
-        const predLoser = pm.winner === pm.home ? pm.away : pm.home;
-        const realLoser = rm.winner === rm.home ? rm.away : rm.home;
-        // Marcador alineado al ganador para que "exacto" no dependa del lado
-        const ps = pm.winner === pm.home ? [pm.s.h, pm.s.a] : [pm.s.a, pm.s.h];
-        const rs = rm.winner === rm.home ? [rm.s.h, rm.s.a] : [rm.s.a, rm.s.h];
-        const sameWinner = pm.winner === rm.winner;
-        const exact = sameWinner && predLoser === realLoser && ps[0] === rs[0] && ps[1] === rs[1];
+        // El CRUCE debe coincidir: los dos equipos reales deben ser los que pusiste.
+        // Si predijiste mal una ronda previa, el partido real en este lugar tiene
+        // otros equipos → no hay puntos (aunque el ganador coincida por casualidad).
+        const sameMatch = (pm.home === rm.home && pm.away === rm.away) ||
+                          (pm.home === rm.away && pm.away === rm.home);
         let pts, label;
-        if (exact)           { pts = isF2 ? SCORING.elim2_exact  : SCORING.elim1_exact;  label = '✅ Exacto'; }
-        else if (sameWinner) { pts = isF2 ? SCORING.elim2_winner : SCORING.elim1_winner; label = '👍 Clasificante'; }
-        else                 { pts = isF2 ? SCORING.elim2_miss   : SCORING.elim1_miss;   label = '❌ Fallo'; }
+        if (!sameMatch) {
+          pts = isF2 ? SCORING.elim2_miss : SCORING.elim1_reach_miss;
+          label = '❌ Otro cruce';
+        } else if (!pm.winner || pm.winner === '?') {
+          return; // tu marcador sin ganador (no debería pasar)
+        } else {
+          const ps = pm.winner === pm.home ? [pm.s.h, pm.s.a] : [pm.s.a, pm.s.h];
+          const rs = rm.winner === rm.home ? [rm.s.h, rm.s.a] : [rm.s.a, rm.s.h];
+          const sameWinner = pm.winner === rm.winner;
+          const exact = sameWinner && ps[0] === rs[0] && ps[1] === rs[1];
+          if (exact)           { pts = isF2 ? SCORING.elim2_exact  : SCORING.elim1_exact;  label = '✅ Exacto'; }
+          else if (sameWinner) { pts = isF2 ? SCORING.elim2_winner : SCORING.elim1_winner; label = '👍 Clasificante'; }
+          else                 { pts = isF2 ? SCORING.elim2_miss   : SCORING.elim1_miss;   label = '❌ Fallo'; }
+        }
         const row = {
           match_id: pm.id,
           pred: `${pm.home} ${pm.s.h}-${pm.s.a} ${pm.away}`,
