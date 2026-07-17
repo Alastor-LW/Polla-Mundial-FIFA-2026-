@@ -39,7 +39,7 @@
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <h2 style="margin:0">📊 Posiciones</h2>
-      <button class="btn btn-sm btn-primary" onclick="load()">↻ Actualizar</button>
+      <button class="btn btn-sm btn-primary" onclick="load(true)">↻ Actualizar</button>
     </div>
     <div class="lb-header-row">
       <div>#</div>
@@ -75,22 +75,28 @@
 <script src="js/data.js?v=a6010ec"></script>
 <script src="js/db.js?v=a6010ec"></script>
 <script>
-let myP=null, allParticipants=[], allResults=[];
+let myP=null, allParticipants=[], allResults=[], loading=false;
 
 window.addEventListener('DOMContentLoaded',async()=>{
   const saved=localStorage.getItem('polla_p');
   if(saved) myP=JSON.parse(saved);
-  await load();
-  setInterval(load,60000);
+  await load(true);
+  // Autorefresco cada 2 min y SOLO si la pestaña está visible; nunca apila peticiones
+  setInterval(()=>{ if(!document.hidden) load(false); }, 120000);
 });
 
-async function load(){
+async function load(force){
+  if(loading) return;            // evita apilar consultas (protege la base)
+  if(!force && document.hidden) return;
+  loading=true;
   try{
     [allParticipants,allResults]=await Promise.all([dbGetParticipants(),dbGetResults()]);
     renderLB();
     updatePrize();
   }catch(e){
-    document.getElementById('lbContainer').innerHTML=`<div class="alert alert-error">Error: ${e.message}</div>`;
+    document.getElementById('lbContainer').innerHTML=`<div class="alert alert-error">⚠️ No se pudo cargar (servidor ocupado). Reintenta con ↻ Actualizar en unos segundos.<br><span style="font-size:.75rem;opacity:.7">${e.message}</span></div>`;
+  }finally{
+    loading=false;
   }
 }
 
