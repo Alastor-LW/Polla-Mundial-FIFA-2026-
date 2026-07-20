@@ -38,7 +38,9 @@ async function dbGetAllPredictions(){
   // (rompía el panel de avance y el recálculo de puntos).
   const all=[];
   for(let from=0;;from+=1000){
-    const{data,error}=await sb.from('predictions').select('*').range(from,from+999);
+    // order('id') es OBLIGATORIO: sin un orden estable y único, la paginación
+    // repite y omite filas entre páginas → puntos mal calculados.
+    const{data,error}=await sb.from('predictions').select('*').order('id').range(from,from+999);
     if(error)throw error;
     all.push(...(data||[]));
     if(!data||data.length<1000)break;

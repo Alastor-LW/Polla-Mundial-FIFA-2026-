@@ -38,7 +38,9 @@ total+=len(rows); print(f"  participants: {len(rows)} filas {tag}")
 for table in ("predictions","results","settings"):
     rows, off = [], 0
     while True:
-        q = f"{table}?select=*&order=created_at" if table!="settings" else f"{table}?select=*"
+        # order=id (único) para que la paginación sea estable: ordenar por
+        # created_at repetía y omitía filas entre páginas.
+        q = f"{table}?select=*&order=id" if table!="settings" else f"{table}?select=*"
         chunk=get(q, f"{off}-{off+999}")
         rows+=chunk
         if len(chunk)<1000: break
